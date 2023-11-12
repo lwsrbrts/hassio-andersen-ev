@@ -1,0 +1,12 @@
+{
+    "codeowners": ["@lwsrbrts"],
+    "config_flow": true,
+    "dependencies": ["pycognito", "gql", "requests_toolbelt", "websockets"],
+    "documentation": "https://github.com/lwsrbrts/andersen-ev",
+    "issue_tracker": "https://github.com/lwsrbrts/andersen-ev/issues",
+    "domain": "andersen",
+    "name": "Andersen EV",
+    "version": "0.0.1",
+    "iot_class": "cloud_polling",
+    "requirements": ["andersen-ev==0.1.4"]
+  }

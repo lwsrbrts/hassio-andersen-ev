@@ -1,0 +1,7 @@
+requirements:
+
+andersen-ev
+pycognito
+gql
+requests_toolbelt
+websockets

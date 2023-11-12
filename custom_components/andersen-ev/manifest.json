@@ -1,7 +1,7 @@
 {
     "codeowners": ["@lwsrbrts"],
     "config_flow": true,
-    "dependencies": ["pycognito", "gql", "requests_toolbelt", "websockets"],
+    "dependencies": [],
     "documentation": "https://github.com/lwsrbrts/andersen-ev",
     "issue_tracker": "https://github.com/lwsrbrts/andersen-ev/issues",
     "domain": "andersen",

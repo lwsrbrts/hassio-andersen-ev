@@ -1,93 +1,112 @@
-"""Platform for light integration."""
+"""Support for Andersen EV locks."""
 from __future__ import annotations
 
 import logging
+from typing import Any
 
-from andersen_ev import AndersenA2
-import voluptuous as vol
-
-# Import the device class from the component that you want to support
-import homeassistant.helpers.config_validation as cv
-from homeassistant.components.lock import (PLATFORM_SCHEMA, LockEntity)
-from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
+from homeassistant.components.lock import LockEntity
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
+
+from . import AndersenEvCoordinator
+from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
-# Validation of the user's configuration
-PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend({
-    vol.Required(CONF_USERNAME): cv.string,
-    vol.Required(CONF_PASSWORD): cv.string,
-})
 
-
-def setup_platform(
-    hass: HomeAssistant,
-    config: ConfigType,
-    add_entities: AddEntitiesCallback,
-    discovery_info: DiscoveryInfoType | None = None
+async def async_setup_entry(
+    hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
-    """Set up the Awesome Light platform."""
-    # Assign configuration variables.
-    # The configuration check takes care they are present.
-    username = config[CONF_USERNAME]
-    password = config.get(CONF_PASSWORD)
-
-    # Setup connection with devices/cloud
-    a2 = AndersenA2()
-    a2.authenticate(username, password)
-
-    # Verify that passed in configuration works
-    #if not a2.confirm_device(CONF_DEVICE):
-    #    _LOGGER.error("Could not connect to AwesomeLight hub")
-    #    return
-
-    # Add devices
-    #devices = a2.get_current_user_devices()
+    """Set up the Andersen EV lock platform."""
+    coordinator = hass.data[DOMAIN][entry.entry_id]
     
-    #add_entities(AwesomeLight(light) for light in hub.lights())
-    #add_entities(AndersenA2Device(user_device) for user_device in devices)
+    entities = []
+    for device in coordinator.data:
+        entities.append(AndersenEvLock(coordinator, device))
     
-    #device = a2.get_device(devices['getCurrentUserDevices'][0]['id'])
-    
-    add_entities(AndersenA2Device(a2))
+    async_add_entities(entities)
 
 
-class AndersenA2Device(LockEntity):
-    """Representation of an Andersen A2."""
+class AndersenEvLock(CoordinatorEntity, LockEntity):
+    """Representation of an Andersen EV charging lock."""
 
-    def __init__(self, lock) -> None:
-        """Initialize an Andersen A2."""
-        self._id = lock['id']
-        self._name = lock['name']
-        self._state = None
+    def __init__(self, coordinator: AndersenEvCoordinator, device) -> None:
+        """Initialize the lock."""
+        super().__init__(coordinator)
+        self._device = device
+        self._attr_unique_id = f"{device.device_id}_lock"
+        self._attr_name = f"{device.friendly_name} Lock"
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, device.device_id)},
+            name=f"{device.friendly_name} ({device.device_id})",
+            manufacturer="Andersen EV",
+            model="A2",  # Default model, will be updated if available from device status
+        )
+        # Update model if device status is already available
+        self._update_model_from_device_status()
+
+    def _update_model_from_device_status(self):
+        """Update model information from device status if available."""
+        if hasattr(self._device, '_last_status') and self._device._last_status:
+            status = self._device._last_status
+            if "sysProductName" in status:
+                self._attr_device_info["model"] = status["sysProductName"]
+            elif "sysProductId" in status:
+                self._attr_device_info["model"] = status["sysProductId"]
+            elif "sysHwVersion" in status:
+                self._attr_device_info["model"] = f"A2 (HW: {status['sysHwVersion']})"
+
+    @property
+    def available(self) -> bool:
+        """Return if entity is available."""
+        for device in self.coordinator.data:
+            if device.device_id == self._device.device_id:
+                self._device = device
+                # Try to update model info if we have device status
+                self._update_model_from_device_status()
+                return True
         
+        # Device no longer exists
+        return False
 
     @property
-    def name(self) -> str:
-        """Return the display name of this lock."""
-        return self._name
+    def is_locked(self) -> bool:
+        """Return true if the lock is locked (charging disabled)."""
+        for device in self.coordinator.data:
+            if device.device_id == self._device.device_id:
+                self._device = device
+                
+                # Get most recent device status from coordinator data
+                for device in self.coordinator.data:
+                    if device.device_id == self._device.device_id:
+                        try:
+                            # We'll check the last known state from coordinator
+                            # This works because the coordinator refreshes regularly
+                            # and we also refresh after lock/unlock actions
+                            if hasattr(device, '_last_status') and device._last_status:
+                                if 'sysUserLock' in device._last_status:
+                                    _LOGGER.debug(f"Device {device.friendly_name} sysUserLock state: {device._last_status['sysUserLock']}")
+                                    return device._last_status['sysUserLock']
+                        except Exception as err:
+                            _LOGGER.error(f"Error getting lock state: {err}")
+                
+                # Fallback to the device's user_lock property
+                return not device.user_lock  # Inverted because enabled=unlocked, disabled=locked
+        
+        # Device no longer exists
+        return False
 
-    @property
-    def is_locked(self) -> bool | None:
-        """Return true if Andersen is locked."""
-        return self._state
+    async def async_lock(self, **kwargs: Any) -> None:
+        """Lock the charging station (disable charging)."""
+        await self._device.disable()
+        _LOGGER.debug(f"Locking device {self._device.friendly_name} (disabling charging)")
+        await self.coordinator.async_request_refresh()
 
-    def lock(self, **kwargs: Any) -> None:
-        """Instruct the light to turn on. """
-        self._lock
-
-    def unlock(self, **kwargs: Any) -> None:
-        """Instruct the light to turn off."""
-        self._light.turn_off()
-
-    def update(self) -> None:
-        """Fetch new state data for this light.
-
-        This is the only method that should fetch new data for Home Assistant.
-        """
-        self._light.update()
-        self._state = self._light.is_on()
-        self._brightness = self._light.brightness
+    async def async_unlock(self, **kwargs: Any) -> None:
+        """Unlock the charging station (enable charging)."""
+        await self._device.enable()
+        _LOGGER.debug(f"Unlocking device {self._device.friendly_name} (enabling charging)")
+        await self.coordinator.async_request_refresh()

@@ -1,6 +1,8 @@
 """Sensor platform for Andersen EV."""
 from __future__ import annotations
 import logging
+from datetime import datetime
+import dateutil.parser
 
 from homeassistant.components.sensor import (
     SensorDeviceClass,
@@ -13,6 +15,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.const import (
     UnitOfEnergy,
+    UnitOfPower,
     UnitOfTime,
 )
 
@@ -31,23 +34,59 @@ async def async_setup_entry(
     
     entities = []
     for device in coordinator.data:
-        # Create energy sensors
+        # Create energy sensors from historical data
         entities.append(AndersenEvEnergySensor(coordinator, device, "energy", "Total Energy", "chargeEnergyTotal"))
         entities.append(AndersenEvEnergySensor(coordinator, device, "grid_energy", "Grid Energy", "gridEnergyTotal"))
         entities.append(AndersenEvEnergySensor(coordinator, device, "solar_energy", "Solar Energy", "solarEnergyTotal"))
         entities.append(AndersenEvEnergySensor(coordinator, device, "surplus_energy", "Surplus Energy", "surplusUsedEnergyTotal"))
         
-        # Create cost sensors
+        # Create cost sensors from historical data
         entities.append(AndersenEvCostSensor(coordinator, device, "cost", "Total Cost", "chargeCostTotal"))
         entities.append(AndersenEvCostSensor(coordinator, device, "grid_cost", "Grid Cost", "gridCostTotal"))
         entities.append(AndersenEvCostSensor(coordinator, device, "solar_cost", "Solar Cost", "solarCostTotal"))
         entities.append(AndersenEvCostSensor(coordinator, device, "surplus_cost", "Surplus Cost", "surplusUsedCostTotal"))
         
-        # Create duration sensor
-        entities.append(AndersenEvDurationSensor(coordinator, device))
-        
         # Create connector state sensor
         entities.append(AndersenEvConnectorSensor(coordinator, device))
+        
+        # Create realtime charge status sensors
+        # Power sensors
+        entities.append(AndersenEvChargeStatusSensor(
+            coordinator, device, "charge_power", "Charge Power", "chargePower",
+            SensorDeviceClass.POWER, SensorStateClass.MEASUREMENT, UnitOfPower.WATT
+        ))
+        entities.append(AndersenEvChargeStatusSensor(
+            coordinator, device, "charge_power_max", "Max Charge Power", "chargePowerMax",
+            SensorDeviceClass.POWER, SensorStateClass.MEASUREMENT, UnitOfPower.WATT
+        ))
+        entities.append(AndersenEvChargeStatusSensor(
+            coordinator, device, "solar_power", "Solar Power", "solarPower",
+            SensorDeviceClass.POWER, SensorStateClass.MEASUREMENT, UnitOfPower.WATT
+        ))
+        entities.append(AndersenEvChargeStatusSensor(
+            coordinator, device, "grid_power", "Grid Power", "gridPower",
+            SensorDeviceClass.POWER, SensorStateClass.MEASUREMENT, UnitOfPower.WATT
+        ))
+        
+        # Energy sensors from realtime status
+        entities.append(AndersenEvChargeStatusSensor(
+            coordinator, device, "current_charge_energy", "Current Session Energy", "chargeEnergyTotal",
+            SensorDeviceClass.ENERGY, SensorStateClass.TOTAL, UnitOfEnergy.KILO_WATT_HOUR
+        ))
+        entities.append(AndersenEvChargeStatusSensor(
+            coordinator, device, "current_solar_energy", "Current Session Solar Energy", "solarEnergyTotal",
+            SensorDeviceClass.ENERGY, SensorStateClass.TOTAL, UnitOfEnergy.KILO_WATT_HOUR
+        ))
+        entities.append(AndersenEvChargeStatusSensor(
+            coordinator, device, "current_grid_energy", "Current Session Grid Energy", "gridEnergyTotal",
+            SensorDeviceClass.ENERGY, SensorStateClass.TOTAL, UnitOfEnergy.KILO_WATT_HOUR
+        ))
+        
+        # Start time sensor
+        entities.append(AndersenEvChargeStatusSensor(
+            coordinator, device, "session_start", "Session Start Time", "start",
+            SensorDeviceClass.TIMESTAMP, None, None
+        ))
     
     async_add_entities(entities)
 
@@ -141,25 +180,6 @@ class AndersenEvCostSensor(AndersenEvBaseSensor):
         if self._last_charge and self._data_key in self._last_charge:
             return self._last_charge[self._data_key]
         return None
-
-
-class AndersenEvDurationSensor(AndersenEvBaseSensor):
-    """Sensor for Andersen EV charge duration."""
-
-    _attr_device_class = SensorDeviceClass.DURATION
-    _attr_native_unit_of_measurement = UnitOfTime.SECONDS
-
-    def __init__(self, coordinator: AndersenEvCoordinator, device) -> None:
-        """Initialize the sensor."""
-        super().__init__(coordinator, device, "duration", "Charge Duration", "duration")
-
-    @property
-    def native_value(self) -> int | None:
-        """Return the duration in seconds."""
-        if self._last_charge and "duration" in self._last_charge:
-            return self._last_charge["duration"]
-        return None
-
 
 class AndersenEvConnectorSensor(CoordinatorEntity, SensorEntity):
     """Sensor for Andersen EV connector state."""
@@ -259,3 +279,94 @@ class AndersenEvConnectorSensor(CoordinatorEntity, SensorEntity):
                     self._last_evse_state = evse_state
         except Exception as err:
             _LOGGER.debug(f"Error updating connector state: {err}")
+
+
+class AndersenEvChargeStatusSensor(CoordinatorEntity, SensorEntity):
+    """Sensor for Andersen EV charge status values."""
+
+    def __init__(self, coordinator: AndersenEvCoordinator, device, sensor_type, name_suffix, data_key, 
+                 device_class=None, state_class=None, unit=None) -> None:
+        """Initialize the sensor."""
+        super().__init__(coordinator)
+        self._device = device
+        self._sensor_type = sensor_type
+        self._data_key = data_key
+        self._attr_name = f"{device.friendly_name} {name_suffix}"
+        self._attr_unique_id = f"{device.device_id}_{sensor_type}"
+        self._attr_device_info = {
+            "identifiers": {(DOMAIN, device.device_id)},
+            "name": f"{device.friendly_name} ({device.device_id})",
+            "manufacturer": "Andersen EV",
+            "model": "A2",  # Default model, will be updated if available from device status
+        }
+        if device_class:
+            self._attr_device_class = device_class
+        if state_class:
+            self._attr_state_class = state_class
+        if unit:
+            self._attr_native_unit_of_measurement = unit
+        self._update_model_from_device_status()
+    
+    def _update_model_from_device_status(self):
+        """Update model information from device status if available."""
+        if hasattr(self._device, '_last_status') and self._device._last_status:
+            status = self._device._last_status
+            if "sysProductName" in status:
+                self._attr_device_info["model"] = status["sysProductName"]
+            elif "sysProductId" in status:
+                self._attr_device_info["model"] = status["sysProductId"]
+            elif "sysHwVersion" in status:
+                self._attr_device_info["model"] = f"A2 (HW: {status['sysHwVersion']})"
+    
+    @property
+    def available(self) -> bool:
+        """Return if the sensor is available."""
+        # Always available if the coordinator and device are available
+        for device in self.coordinator.data:
+            if device.device_id == self._device.device_id:
+                self._device = device
+                # Check if chargeStatus exists in last_status
+                if (hasattr(self._device, '_last_status') and 
+                    self._device._last_status and 
+                    'chargeStatus' in self._device._last_status):
+                    return self.coordinator.last_update_success
+        return False
+    
+    @property
+    def native_value(self) -> float | int | str | None:
+        """Return the sensor value."""
+        # Check if device exists in coordinator data and update reference
+        for device in self.coordinator.data:
+            if device.device_id == self._device.device_id:
+                self._device = device
+                break
+        
+        # Check if the device has charge status information
+        if (hasattr(self._device, '_last_status') and 
+            self._device._last_status and 
+            'chargeStatus' in self._device._last_status and 
+            self._data_key in self._device._last_status['chargeStatus']):
+            value = self._device._last_status['chargeStatus'][self._data_key]
+            if self._attr_device_class == SensorDeviceClass.TIMESTAMP and isinstance(value, str):
+                try:
+                    return dateutil.parser.isoparse(value)
+                except ValueError:
+                    _LOGGER.debug(f"Error parsing timestamp: {value}")
+                    return None
+            return value
+        return None
+
+    async def async_update(self) -> None:
+        """Update the entity with latest status from coordinator."""
+        await super().async_update()
+        
+        # Force refresh of device status to get the latest data
+        try:
+            # Update model if device status is available
+            self._update_model_from_device_status()
+            
+            # This will make the sensors more responsive
+            # by getting the most up-to-date status directly from the API
+            await self._device.getDeviceStatus()
+        except Exception as err:
+            _LOGGER.debug(f"Error updating charge status sensor: {err}")

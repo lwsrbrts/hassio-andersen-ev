@@ -1,4 +1,4 @@
-"""Constants for the Andersen EV Charger integration."""
+"""Constants for the Andersen EV integration."""
 
 DOMAIN = "andersen_ev"
 

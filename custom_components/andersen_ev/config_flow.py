@@ -1,4 +1,4 @@
-"""Config flow for Andersen EV Charger integration."""
+"""Config flow for Andersen EV integration."""
 import logging
 import voluptuous as vol
 
@@ -45,7 +45,7 @@ async def validate_input(hass: HomeAssistant, data):
 
 
 class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
-    """Handle a config flow for Andersen EV Charger."""
+    """Handle a config flow for Andersen EV."""
 
     VERSION = 1
 

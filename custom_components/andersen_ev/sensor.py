@@ -1,4 +1,4 @@
-"""Sensor platform for Andersen EV Charger."""
+"""Sensor platform for Andersen EV."""
 from __future__ import annotations
 import logging
 

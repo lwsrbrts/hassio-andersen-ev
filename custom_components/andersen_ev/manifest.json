@@ -1,6 +1,6 @@
 {
   "domain": "andersen_ev",
-  "name": "Andersen EV Charger",
+  "name": "Andersen EV",
   "documentation": "https://github.com/lwsrbrts/hassio-andersen-ev",
   "dependencies": [],
   "codeowners": ["@lwsrbrts"],

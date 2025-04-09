@@ -1,6 +1,6 @@
 enable_charging:
   name: Enable Charging
-  description: Enable charging for an Andersen EV charger
+  description: Enable charging for an Andersen EV charge point
   target:
     entity:
       integration: andersen_ev
@@ -16,7 +16,7 @@ enable_charging:
 
 disable_charging:
   name: Disable Charging
-  description: Disable charging for an Andersen EV charger
+  description: Disable charging for an Andersen EV charge point
   target:
     entity:
       integration: andersen_ev

@@ -1,4 +1,4 @@
-"""The Andersen EV Charger integration."""
+"""The Andersen EV integration."""
 import logging
 import asyncio
 from datetime import timedelta

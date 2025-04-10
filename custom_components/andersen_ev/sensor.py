@@ -185,7 +185,7 @@ class AndersenEvConnectorSensor(CoordinatorEntity, SensorEntity):
     """Sensor for Andersen EV connector state."""
 
     _attr_device_class = SensorDeviceClass.ENUM
-    _attr_options = ["Unplugged", "Connected", "Locked", "Charging", "unknown"]
+    _attr_options = ["Ready", "Connected", "Charging", "Error", "Sleeping", "Disabled", "unknown"]
     
     def __init__(self, coordinator: AndersenEvCoordinator, device) -> None:
         """Initialize the sensor."""
@@ -246,13 +246,17 @@ class AndersenEvConnectorSensor(CoordinatorEntity, SensorEntity):
                 
                 # Map evseState values to connector states
                 if evse_state == "1" or evse_state == 1:
-                    self._connector_state = "Unplugged"
+                    self._connector_state = "Ready"
                 elif evse_state == "2" or evse_state == 2:
                     self._connector_state = "Connected"
                 elif evse_state == "3" or evse_state == 3:
                     self._connector_state = "Charging"
+                elif evse_state == "4" or evse_state == 4:
+                    self._connector_state = "Error"
+                elif evse_state == "254" or evse_state == 254:
+                    self._connector_state = "Sleeping"
                 elif evse_state == "255" or evse_state == 255:
-                    self._connector_state = "Locked"
+                    self._connector_state = "Disabled"
                 else:
                     # Log unknown states for debugging
                     _LOGGER.debug(f"Unknown EVSE state: {evse_state} for {self._device.friendly_name}")

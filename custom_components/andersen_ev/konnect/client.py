@@ -1,8 +1,13 @@
 import asyncio
+import json
+import time
+import logging
 import requests
 from . import const
 from .device import KonnectDevice
 from warrant.aws_srp import AWSSRP
+
+_LOGGER = logging.getLogger(__name__)
 
 class KonnectClient:
     email = None
@@ -12,13 +17,20 @@ class KonnectClient:
     token = None
     tokenType = None
     tokenExpiresIn = None
+    tokenExpiryTime = None  # New field to track token expiration time
     refreshToken = None
 
     def __init__(self, email, password):
         self.email = email
         self.password = password
+        self.token = None
+        self.tokenType = None
+        self.tokenExpiresIn = None
+        self.tokenExpiryTime = None
+        self.refreshToken = None  # Keeping property for compatibility with storage
 
     async def authenticate_user(self):
+        """Authenticate with AWS Cognito using SRP."""
         # Before we can sign in, we need to determine the username. This is done
         # by making a request that for a given email, it will return the username
         # (if it exists.)
@@ -35,8 +47,14 @@ class KonnectClient:
             self.token = aws_result['IdToken']
             self.tokenType = aws_result['TokenType']
             self.tokenExpiresIn = aws_result['ExpiresIn']
-            self.refreshToken = aws_result['RefreshToken']
+            # Calculate absolute expiry time (subtract 5 minutes for safety margin)
+            self.tokenExpiryTime = time.time() + aws_result['ExpiresIn'] - 90
+            self.refreshToken = aws_result['RefreshToken']  # Still store for future use if needed
+            
+            _LOGGER.debug("Authentication successful, token will expire in %s seconds", aws_result['ExpiresIn'])
+            
         except Exception as e:
+            _LOGGER.error("Authentication failed: %s", str(e))
             raise Exception(f'Failed to sign in: {str(e)}')
 
     def __authenticate_with_aws_srp(self):
@@ -49,8 +67,25 @@ class KonnectClient:
             client_id = '23s0olnnniu5472ons0d9uoqt9')
         return aws_srp.authenticate_user()
 
+    async def refresh_token(self):
+        """Perform a full re-authentication instead of trying to use refresh tokens."""
+        _LOGGER.debug("Performing full re-authentication instead of token refresh")
+        await self.authenticate_user()
+            
+    async def is_token_valid(self):
+        """Check if the current token is still valid."""
+        if not self.token:
+            return False
+            
+        if not self.tokenExpiryTime:
+            return False
+            
+        # Check if token is expired
+        return time.time() < self.tokenExpiryTime
+
     async def getDevices(self):
-        self.__checkToken()
+        """Get list of devices from the API."""
+        await self.ensure_valid_auth()
         devices = []
 
         url = const.API_DEVICES_URL
@@ -62,13 +97,24 @@ class KonnectClient:
         )
 
         if response.status_code != 200:
-            print('Status Code: ' + str(response.status_code))
+            if response.status_code == 401:
+                # Token expired during request, refresh and retry
+                _LOGGER.debug("Token expired during getDevices request, refreshing")
+                await self.refresh_token()
+                return await self.getDevices()
+                
+            _LOGGER.error('Failed to get devices. Status Code: %s, Response: %s',
+                        response.status_code, response.text)
             return devices
 
         response_body = response.json()
-
-        # Log Devices
-        print(response_body)
+        
+        if not response_body.get('devices'):
+            _LOGGER.warning("No devices found in API response")
+            return devices
+            
+        # Debug log number of devices found
+        _LOGGER.debug("Found %s devices", len(response_body['devices']))
 
         for device in response_body['devices']:
             devices.append(KonnectDevice(
@@ -100,6 +146,11 @@ class KonnectClient:
 
         return response_body['username']
 
-    def __checkToken(self):
-        if self.token == None:
-            raise Exception('Not signed in')
+    async def ensure_valid_auth(self):
+        """Ensure we have a valid authentication token."""
+        if not await self.is_token_valid():
+            _LOGGER.debug("Token invalid or expired, refreshing")
+            await self.refresh_token()
+        else:
+            _LOGGER.debug("Token still valid, expiry in %s seconds", 
+                         int(self.tokenExpiryTime - time.time()) if self.tokenExpiryTime else "unknown")

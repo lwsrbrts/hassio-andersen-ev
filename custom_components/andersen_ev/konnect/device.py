@@ -43,6 +43,10 @@ class KonnectDevice:
         return success
 
     async def __runCommand(self, function):
+        """Run a command on the device with automatic token refresh."""
+        # Ensure we have a valid token before making the request
+        await self.api.ensure_valid_auth()
+        
         url = const.GRAPHQL_URL
         body = {
             'operationName': 'runAEVCommand',
@@ -62,6 +66,12 @@ class KonnectDevice:
             status_code = response.status_code
             _LOGGER.debug(f"API command response status code: {status_code}")
             
+            if status_code == 401:
+                # Token expired, re-authenticate and retry
+                _LOGGER.debug("Authentication token expired during command execution, re-authenticating")
+                await self.api.authenticate_user()
+                return await self.__runCommand(function)
+                
             if status_code == 200:
                 try:
                     response_json = response.json()
@@ -86,6 +96,9 @@ class KonnectDevice:
 
     async def getDeviceStatus(self):
         """Get the real-time status of the device."""
+        # Ensure we have a valid token before making the request
+        await self.api.ensure_valid_auth()
+        
         url = const.GRAPHQL_URL
         body = {
             'operationName': 'getDeviceStatusSimple',
@@ -94,40 +107,57 @@ class KonnectDevice:
         }
 
         # Run blocking requests call in an executor to avoid blocking the event loop
-        response = await asyncio.get_event_loop().run_in_executor(
-            None,
-            lambda: requests.post(url, json=body, auth=BearerAuth(self.api.token))
-        )
-
-        if response.status_code != 200:
-            return None
+        try:
+            response = await asyncio.get_event_loop().run_in_executor(
+                None,
+                lambda: requests.post(url, json=body, auth=BearerAuth(self.api.token))
+            )
             
-        response_body = response.json()
-        if 'data' not in response_body or 'getDevice' not in response_body['data'] or 'deviceStatus' not in response_body['data']['getDevice']:
-            return None
-        
-        # Store the last status for reference in the lock entity
-        status = response_body['data']['getDevice']['deviceStatus']
-        
-        # Log changes to important status values
-        log_changes = False
-        if self._last_status and 'evseState' in status and 'evseState' in self._last_status:
-            if status['evseState'] != self._last_status['evseState']:
-                _LOGGER.info(f"Device {self.friendly_name}: EVSE state changed from {self._last_status['evseState']} to {status['evseState']}")
-                log_changes = True
+            if response.status_code == 401:
+                # Token expired, refresh and retry
+                _LOGGER.debug("Authentication token expired during status request, refreshing")
+                await self.api.refresh_token()
+                return await self.getDeviceStatus()
                 
-        if self._last_status and 'online' in status and 'online' in self._last_status:
-            if status['online'] != self._last_status['online']:
-                _LOGGER.info(f"Device {self.friendly_name}: Online state changed from {self._last_status['online']} to {status['online']}")
-                log_changes = True
+            if response.status_code != 200:
+                _LOGGER.warning(f"Failed to get device status, status code: {response.status_code}")
+                return None
                 
-        if log_changes:
-            _LOGGER.debug(f"Full status for {self.friendly_name}: {status}")
+            response_body = response.json()
+            if 'data' not in response_body or 'getDevice' not in response_body['data'] or 'deviceStatus' not in response_body['data']['getDevice']:
+                _LOGGER.warning("Invalid response format from device status request")
+                return None
             
-        self._last_status = status
-        return status
+            # Store the last status for reference in the lock entity
+            status = response_body['data']['getDevice']['deviceStatus']
+            
+            # Log changes to important status values
+            log_changes = False
+            if self._last_status and 'evseState' in status and 'evseState' in self._last_status:
+                if status['evseState'] != self._last_status['evseState']:
+                    _LOGGER.info(f"Device {self.friendly_name}: EVSE state changed from {self._last_status['evseState']} to {status['evseState']}")
+                    log_changes = True
+                    
+            if self._last_status and 'online' in status and 'online' in self._last_status:
+                if status['online'] != self._last_status['online']:
+                    _LOGGER.info(f"Device {self.friendly_name}: Online state changed from {self._last_status['online']} to {status['online']}")
+                    log_changes = True
+                    
+            if log_changes:
+                _LOGGER.debug(f"Full status for {self.friendly_name}: {status}")
+                
+            self._last_status = status
+            return status
+            
+        except Exception as err:
+            _LOGGER.error(f"Error getting device status: {err}")
+            return None
 
     async def getLastCharge(self):
+        """Get the last charge session data."""
+        # Ensure we have a valid token before making the request
+        await self.api.ensure_valid_auth()
+        
         url = const.GRAPHQL_URL
         body = {
             'operationName': 'getDeviceCalculatedChargeLogs',
@@ -136,28 +166,52 @@ class KonnectDevice:
         }
 
         # Run blocking requests call in an executor to avoid blocking the event loop
-        response = await asyncio.get_event_loop().run_in_executor(
-            None,
-            lambda: requests.post(url, json=body, auth=BearerAuth(self.api.token))
-        )
-
-        if response.status_code != 200:
-            return None
+        try:
+            response = await asyncio.get_event_loop().run_in_executor(
+                None,
+                lambda: requests.post(url, json=body, auth=BearerAuth(self.api.token))
+            )
             
-        response_body = response.json()
-        device_logs = response_body['data']['getDevice']['deviceCalculatedChargeLogs']
-        if len(device_logs) == 0:
-            return None
+            if response.status_code == 401:
+                # Token expired, re-authenticate and retry
+                _LOGGER.debug("Authentication token expired during last charge request, re-authenticating")
+                await self.api.authenticate_user()
+                return await self.getLastCharge()
+            
+            if response.status_code != 200:
+                _LOGGER.warning(f"Failed to get last charge, status code: {response.status_code}")
+                return None
+                
+            response_body = response.json()
+            
+            if 'errors' in response_body:
+                _LOGGER.warning(f"GraphQL errors in charge logs response: {response_body['errors']}")
+                return None
+                
+            if ('data' not in response_body or 
+                'getDevice' not in response_body['data'] or 
+                'deviceCalculatedChargeLogs' not in response_body['data']['getDevice']):
+                _LOGGER.warning("Invalid response format from last charge request")
+                return None
+                
+            device_logs = response_body['data']['getDevice']['deviceCalculatedChargeLogs']
+            if len(device_logs) == 0:
+                _LOGGER.debug(f"No charge logs available for device {self.friendly_name}")
+                return None
 
-        latest_log = device_logs[0]
-        return {
-            'duration': latest_log['duration'],
-            'chargeCostTotal': latest_log['chargeCostTotal'],
-            'chargeEnergyTotal': latest_log['chargeEnergyTotal'],
-            'gridCostTotal': latest_log['gridCostTotal'],
-            'gridEnergyTotal': latest_log['gridEnergyTotal'],
-            'solarEnergyTotal': latest_log['solarEnergyTotal'],
-            'solarCostTotal': latest_log['solarCostTotal'],
-            'surplusUsedCostTotal': latest_log['surplusUsedCostTotal'],
-            'surplusUsedEnergyTotal': latest_log['surplusUsedEnergyTotal']
-        }
+            latest_log = device_logs[0]
+            return {
+                'duration': latest_log['duration'],
+                'chargeCostTotal': latest_log['chargeCostTotal'],
+                'chargeEnergyTotal': latest_log['chargeEnergyTotal'],
+                'gridCostTotal': latest_log['gridCostTotal'],
+                'gridEnergyTotal': latest_log['gridEnergyTotal'],
+                'solarEnergyTotal': latest_log['solarEnergyTotal'],
+                'solarCostTotal': latest_log['solarCostTotal'],
+                'surplusUsedCostTotal': latest_log['surplusUsedCostTotal'],
+                'surplusUsedEnergyTotal': latest_log['surplusUsedEnergyTotal']
+            }
+            
+        except Exception as err:
+            _LOGGER.error(f"Error getting last charge data: {err}")
+            return None

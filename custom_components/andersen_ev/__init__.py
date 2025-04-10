@@ -2,6 +2,7 @@
 import logging
 import asyncio
 from datetime import timedelta
+import json
 
 import voluptuous as vol
 
@@ -14,13 +15,16 @@ from homeassistant.helpers.typing import ConfigType
 from homeassistant.const import Platform
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.exceptions import ConfigEntryAuthFailed
+from homeassistant.helpers.storage import Store
 
 from .const import (
     DOMAIN, 
     DEFAULT_SCAN_INTERVAL, 
     SERVICE_ENABLE_CHARGING,
     SERVICE_DISABLE_CHARGING,
-    ATTR_DEVICE_ID
+    ATTR_DEVICE_ID,
+    STORAGE_VERSION,
+    STORAGE_KEY
 )
 
 PLATFORMS = [Platform.LOCK, Platform.SENSOR]
@@ -37,7 +41,24 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     email = entry.data["email"]
     password = entry.data["password"]
 
-    coordinator = AndersenEvCoordinator(hass, email, password)
+    # Create a storage manager for tokens
+    storage = Store(hass, STORAGE_VERSION, STORAGE_KEY)
+    token_data = await storage.async_load() or {}
+    
+    # Create the client with stored tokens if available
+    client = KonnectClient(email, password)
+    
+    # If we have stored tokens, set them in the client
+    if entry.entry_id in token_data:
+        stored_tokens = token_data[entry.entry_id]
+        _LOGGER.debug("Found stored tokens for %s", email)
+        client.token = stored_tokens.get("token")
+        client.tokenType = stored_tokens.get("tokenType")
+        client.tokenExpiresIn = stored_tokens.get("tokenExpiresIn")
+        client.tokenExpiryTime = stored_tokens.get("tokenExpiryTime")
+        client.refreshToken = stored_tokens.get("refreshToken")
+
+    coordinator = AndersenEvCoordinator(hass, client, storage, entry.entry_id)
     
     # Fetch initial data so we have data when entities subscribe
     await coordinator.async_config_entry_first_refresh()
@@ -93,7 +114,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 class AndersenEvCoordinator(DataUpdateCoordinator):
     """Data update coordinator for Andersen EV."""
 
-    def __init__(self, hass: HomeAssistant, email: str, password: str) -> None:
+    def __init__(self, hass: HomeAssistant, client: KonnectClient, storage: Store, entry_id: str) -> None:
         """Initialize the coordinator."""
         super().__init__(
             hass,
@@ -101,43 +122,114 @@ class AndersenEvCoordinator(DataUpdateCoordinator):
             name=DOMAIN,
             update_interval=timedelta(seconds=DEFAULT_SCAN_INTERVAL),
         )
-        self.client = KonnectClient(email, password)
+        self.client = client
         self.devices = []
+        self.auth_failures = 0
+        self.max_auth_failures = 3
+        self.storage = storage
+        self.entry_id = entry_id
 
     async def _async_update_data(self):
-        """Fetch data from API endpoint."""
+        """Fetch data from API endpoint with automatic token refresh."""
         try:
-            # If not authenticated, authenticate
-            if self.client.token is None:
-                await self.client.authenticate_user()
-            
+            # Reset auth failures counter on successful updates
+            if self.devices:
+                self.auth_failures = 0
+
             # Get devices
             devices = await self.client.getDevices()
+            
+            # Save tokens after successful API call
+            await self._save_tokens()
+            
             if not devices:
                 _LOGGER.warning("No devices found")
-            else:
-                # For each device, fetch the current status
-                for device in devices:
-                    _LOGGER.debug(f"Device ID: {device.device_id}, Name: {device.friendly_name}, User Lock: {device.user_lock}")
-                    
-                    # Fetch and log device status
-                    try:
-                        device_status = await device.getDeviceStatus()
-                        if device_status:
-                            _LOGGER.debug(f"Device Status for {device.friendly_name}: {device_status}")
-                            if 'evseState' in device_status:
-                                _LOGGER.debug(f"EVSE State: {device_status['evseState']}")
-                            if 'online' in device_status:
-                                _LOGGER.debug(f"Online: {device_status['online']}")
-                            if 'sysChargingEnabled' in device_status:
-                                _LOGGER.debug(f"System Charging Enabled: {device_status['sysChargingEnabled']}")
-                            if 'sysUserLock' in device_status:
-                                _LOGGER.debug(f"System User Lock: {device_status['sysUserLock']}")
-                    except Exception as status_err:
-                        _LOGGER.debug(f"Error getting device status for {device.friendly_name}: {status_err}")
+                
+                # Increment auth failures counter
+                self.auth_failures += 1
+                
+                # If we exceed the max failures, raise an auth exception
+                # This will trigger a config entry reload
+                if self.auth_failures >= self.max_auth_failures:
+                    _LOGGER.error("Multiple authentication failures, requesting re-authentication")
+                    self.auth_failures = 0
+                    raise ConfigEntryAuthFailed("Persistent authentication failures")
+                
+                # If we still have existing devices from previous update, return those
+                if self.devices:
+                    _LOGGER.info("Using cached device data")
+                    return self.devices
+            
+            # Cache the devices for potential future use
+            self.devices = devices
+            
+            # For each device, fetch the current status
+            for device in devices:
+                _LOGGER.debug(f"Device ID: {device.device_id}, Name: {device.friendly_name}, User Lock: {device.user_lock}")
+                
+                # Fetch and log device status
+                try:
+                    device_status = await device.getDeviceStatus()
+                    if device_status:
+                        _LOGGER.debug(f"Device Status for {device.friendly_name}: evseState={device_status.get('evseState')}, online={device_status.get('online')}, charging={device_status.get('sysChargingEnabled')}, locked={device_status.get('sysUserLock')}")
+                except Exception as status_err:
+                    _LOGGER.debug(f"Error getting device status for {device.friendly_name}: {status_err}")
             
             return devices
+        except ConfigEntryAuthFailed as auth_err:
+            # Pass this through to trigger re-authentication
+            raise auth_err
         except Exception as err:
-            if "Failed to sign in" in str(err):
-                raise ConfigEntryAuthFailed("Authentication failed") from err
+            # Check if this is an authentication error
+            if "Failed to sign in" in str(err) or "Authentication failed" in str(err) or "Unauthorized" in str(err) or "401" in str(err):
+                _LOGGER.error("Authentication error: %s", str(err))
+                
+                # Increment auth failures counter
+                self.auth_failures += 1
+                
+                # If we exceed the max failures, raise an auth exception
+                if self.auth_failures >= self.max_auth_failures:
+                    _LOGGER.error("Multiple authentication failures, requesting re-authentication")
+                    self.auth_failures = 0
+                    raise ConfigEntryAuthFailed("Authentication failed") from err
+                    
+                # Try a full re-authentication
+                try:
+                    await self.client.authenticate_user()
+                    _LOGGER.info("Re-authentication successful")
+                    
+                    # Save new tokens after successful re-authentication
+                    await self._save_tokens()
+                    
+                    # Try again with the new token
+                    return await self._async_update_data()
+                except Exception as auth_err:
+                    _LOGGER.error("Re-authentication failed: %s", str(auth_err))
+                    
+                # If we still have existing devices from previous update, return those
+                if self.devices:
+                    _LOGGER.info("Using cached device data")
+                    return self.devices
+                    
             raise UpdateFailed(f"Error communicating with Andersen EV API: {err}")
+    
+    async def _save_tokens(self):
+        """Save authentication tokens to persistent storage."""
+        try:
+            # Load existing data
+            token_data = await self.storage.async_load() or {}
+            
+            # Update with current client tokens
+            token_data[self.entry_id] = {
+                "token": self.client.token,
+                "tokenType": self.client.tokenType,
+                "tokenExpiresIn": self.client.tokenExpiresIn,
+                "tokenExpiryTime": self.client.tokenExpiryTime,
+                "refreshToken": self.client.refreshToken
+            }
+            
+            # Save back to storage
+            await self.storage.async_save(token_data)
+            _LOGGER.debug("Auth tokens saved to persistent storage")
+        except Exception as err:
+            _LOGGER.warning("Failed to save auth tokens: %s", str(err))

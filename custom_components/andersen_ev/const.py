@@ -13,6 +13,10 @@ DEFAULT_SCAN_INTERVAL = 60  # seconds
 SERVICE_ENABLE_CHARGING = "enable_charging"
 SERVICE_DISABLE_CHARGING = "disable_charging"
 
+# Storage
+STORAGE_VERSION = 1
+STORAGE_KEY = f"{DOMAIN}.auth_tokens"
+
 # Attributes
 ATTR_DEVICE_ID = "device_id"
 ATTR_DURATION = "duration"

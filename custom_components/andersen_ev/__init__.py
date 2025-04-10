@@ -20,11 +20,10 @@ from homeassistant.helpers.storage import Store
 from .const import (
     DOMAIN, 
     DEFAULT_SCAN_INTERVAL, 
-    SERVICE_ENABLE_CHARGING,
-    SERVICE_DISABLE_CHARGING,
     ATTR_DEVICE_ID,
     STORAGE_VERSION,
-    STORAGE_KEY
+    STORAGE_KEY,
+    SERVICE_DISABLE_ALL_SCHEDULES
 )
 
 PLATFORMS = [Platform.LOCK, Platform.SENSOR]
@@ -66,25 +65,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data[DOMAIN][entry.entry_id] = coordinator
     
     # Register services
-    async def enable_charging(call: ServiceCall) -> None:
-        """Enable charging for a device."""
+    async def disable_all_schedules(call: ServiceCall) -> None:
+        """Disable all schedules for a device."""
         device_id = call.data.get(ATTR_DEVICE_ID)
         devices = coordinator.data
         
         for device in devices:
             if device.device_id == device_id:
-                await device.enable()
-                await coordinator.async_request_refresh()
-                break
-    
-    async def disable_charging(call: ServiceCall) -> None:
-        """Disable charging for a device."""
-        device_id = call.data.get(ATTR_DEVICE_ID)
-        devices = coordinator.data
-        
-        for device in devices:
-            if device.device_id == device_id:
-                await device.disable()
+                await device.disable_all_schedules()
                 await coordinator.async_request_refresh()
                 break
     
@@ -92,11 +80,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     service_schema = vol.Schema({vol.Required(ATTR_DEVICE_ID): str})
     
     hass.services.async_register(
-        DOMAIN, SERVICE_ENABLE_CHARGING, enable_charging, schema=service_schema
-    )
-    
-    hass.services.async_register(
-        DOMAIN, SERVICE_DISABLE_CHARGING, disable_charging, schema=service_schema
+        DOMAIN, SERVICE_DISABLE_ALL_SCHEDULES, disable_all_schedules, schema=service_schema
     )
     
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)

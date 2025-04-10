@@ -10,8 +10,7 @@ CONF_PASSWORD = "password"
 DEFAULT_SCAN_INTERVAL = 60  # seconds
 
 # Services
-SERVICE_ENABLE_CHARGING = "enable_charging"
-SERVICE_DISABLE_CHARGING = "disable_charging"
+SERVICE_DISABLE_ALL_SCHEDULES = "disable_all_schedules"
 
 # Storage
 STORAGE_VERSION = 1

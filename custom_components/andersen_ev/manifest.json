@@ -7,6 +7,6 @@
   "requirements": ["warrant", "aiohttp"],
   "config_flow": true,
   "iot_class": "cloud_polling",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "icon": "mdi:ev-station"
 }

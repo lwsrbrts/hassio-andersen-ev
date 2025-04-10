@@ -1,30 +1,10 @@
-enable_charging:
-  name: Enable Charging
-  description: Enable charging for an Andersen EV charge point
-  target:
-    entity:
-      integration: andersen_ev
-      domain: switch
+disable_all_schedules:
+  name: Disable All Schedules
+  description: Disable all charging schedules for an Andersen EV charge point
   fields:
     device_id:
       name: Device ID
-      description: The ID of the Andersen EV device to enable
-      required: true
-      example: "12345-67890"
-      selector:
-        text: {}
-
-disable_charging:
-  name: Disable Charging
-  description: Disable charging for an Andersen EV charge point
-  target:
-    entity:
-      integration: andersen_ev
-      domain: switch
-  fields:
-    device_id:
-      name: Device ID
-      description: The ID of the Andersen EV device to disable
+      description: The ID of the Andersen EV device to disable schedules for
       required: true
       example: "12345-67890"
       selector:

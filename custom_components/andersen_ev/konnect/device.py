@@ -42,6 +42,60 @@ class KonnectDevice:
             _LOGGER.warning(f"Failed to disable charging for device {self.device_id} ({self.friendly_name})")
         return success
 
+    async def disable_all_schedules(self):
+        """Disable all charging schedules for the device."""
+        _LOGGER.debug(f"Attempting to disable all schedules for device {self.device_id} ({self.friendly_name})")
+        
+        # Ensure we have a valid token before making the request
+        await self.api.ensure_valid_auth()
+        
+        url = const.GRAPHQL_URL
+        body = {
+            'operationName': 'setAllSchedulesDisabled',
+            'variables': { 'deviceId': self.device_id },
+            'query': 'mutation setAllSchedulesDisabled($deviceId: ID!) { setAllSchedulesDisabled(deviceId: $deviceId) { id name return_value } }'
+        }
+
+        _LOGGER.debug(f"Sending API command to disable all schedules for device {self.device_id}")
+        
+        # Run blocking requests call in an executor to avoid blocking the event loop
+        try:
+            response = await asyncio.get_event_loop().run_in_executor(
+                None, 
+                lambda: requests.post(url, json=body, auth=BearerAuth(self.api.token))
+            )
+            
+            status_code = response.status_code
+            _LOGGER.debug(f"API command response status code: {status_code}")
+            
+            if status_code == 401:
+                # Token expired, re-authenticate and retry
+                _LOGGER.debug("Authentication token expired during command execution, re-authenticating")
+                await self.api.authenticate_user()
+                return await self.disable_all_schedules()
+                
+            if status_code == 200:
+                try:
+                    response_json = response.json()
+                    _LOGGER.debug(f"API disable all schedules response: {response_json}")
+                    
+                    # Check if there are errors in the GraphQL response
+                    if 'errors' in response_json:
+                        _LOGGER.warning(f"GraphQL errors in response: {response_json['errors']}")
+                        return False
+                        
+                    return True
+                except Exception as json_err:
+                    _LOGGER.warning(f"Error parsing JSON response: {json_err}")
+                    return False
+            else:
+                _LOGGER.warning(f"API command failed with status code {status_code}: {response.text}")
+                return False
+                
+        except Exception as err:
+            _LOGGER.error(f"Error executing disable all schedules: {err}")
+            return False
+
     async def __runCommand(self, function):
         """Run a command on the device with automatic token refresh."""
         # Ensure we have a valid token before making the request

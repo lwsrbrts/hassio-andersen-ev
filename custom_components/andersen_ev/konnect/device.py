@@ -269,3 +269,49 @@ class KonnectDevice:
         except Exception as err:
             _LOGGER.error(f"Error getting last charge data: {err}")
             return None
+
+    async def getDeviceInfo(self):
+        """Get the detailed device information."""
+        _LOGGER.debug(f"Fetching detailed info for device {self.device_id} ({self.friendly_name})")
+        
+        # Ensure we have a valid token before making the request
+        await self.api.ensure_valid_auth()
+        
+        url = const.GRAPHQL_URL
+        body = {
+            'operationName': 'getDevice',
+            'variables': { 'id': self.device_id },
+            'query': const.GRAPHQL_DEVICE_INFO_QUERY
+        }
+
+        # Run blocking requests call in an executor to avoid blocking the event loop
+        try:
+            response = await asyncio.get_event_loop().run_in_executor(
+                None,
+                lambda: requests.post(url, json=body, auth=BearerAuth(self.api.token))
+            )
+            
+            if response.status_code == 401:
+                # Token expired, refresh and retry
+                _LOGGER.debug("Authentication token expired during device info request, refreshing")
+                await self.api.refresh_token()
+                return await self.getDeviceInfo()
+                
+            if response.status_code != 200:
+                _LOGGER.warning(f"Failed to get device info, status code: {response.status_code}")
+                return None
+                
+            response_body = response.json()
+            if 'data' not in response_body or 'getDevice' not in response_body['data']:
+                _LOGGER.warning("Invalid response format from device info request")
+                return None
+            
+            device_info = response_body['data']['getDevice']
+            _LOGGER.debug(f"Successfully retrieved device info for {self.friendly_name}")
+            
+            # Return a clean dictionary with the relevant device information
+            return device_info
+            
+        except Exception as err:
+            _LOGGER.error(f"Error getting device info: {err}")
+            return None

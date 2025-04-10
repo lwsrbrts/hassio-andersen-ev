@@ -23,7 +23,8 @@ from .const import (
     ATTR_DEVICE_ID,
     STORAGE_VERSION,
     STORAGE_KEY,
-    SERVICE_DISABLE_ALL_SCHEDULES
+    SERVICE_DISABLE_ALL_SCHEDULES,
+    SERVICE_GET_DEVICE_INFO
 )
 
 PLATFORMS = [Platform.LOCK, Platform.SENSOR]
@@ -76,11 +77,31 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 await coordinator.async_request_refresh()
                 break
     
+    async def get_device_info(call: ServiceCall) -> dict:
+        """Get detailed information for a device and return it to the UI."""
+        device_id = call.data.get(ATTR_DEVICE_ID)
+        devices = coordinator.data
+        
+        for device in devices:
+            if device.device_id == device_id:
+                device_info = await device.getDeviceInfo()
+                if device_info:
+                    # Return the device info as a response that will be shown in the UI
+                    return device_info
+                return {"error": "Failed to retrieve device information"}
+        
+        return {"error": f"Device with ID {device_id} not found"}
+    
     # Register services using simpler schema
     service_schema = vol.Schema({vol.Required(ATTR_DEVICE_ID): str})
     
     hass.services.async_register(
         DOMAIN, SERVICE_DISABLE_ALL_SCHEDULES, disable_all_schedules, schema=service_schema
+    )
+    
+    # Register the get_device_info service with response support
+    hass.services.async_register(
+        DOMAIN, SERVICE_GET_DEVICE_INFO, get_device_info, schema=service_schema, supports_response=True
     )
     
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)

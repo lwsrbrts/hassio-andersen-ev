@@ -11,6 +11,7 @@ DEFAULT_SCAN_INTERVAL = 60  # seconds
 
 # Services
 SERVICE_DISABLE_ALL_SCHEDULES = "disable_all_schedules"
+SERVICE_GET_DEVICE_INFO = "get_device_info"
 
 # Storage
 STORAGE_VERSION = 1

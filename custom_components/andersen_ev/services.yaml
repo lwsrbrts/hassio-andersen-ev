@@ -9,3 +9,18 @@ disable_all_schedules:
       example: "12345-67890"
       selector:
         text: {}
+
+get_device_info:
+  name: Get Device Info
+  description: Get detailed information about an Andersen EV charge point with results displayed in the UI
+  fields:
+    device_id:
+      name: Device ID
+      description: The ID of the Andersen EV device to get information for
+      required: true
+      example: "12345-67890"
+      selector:
+        text: {}
+  response:
+    name: Device Information
+    description: Returns detailed information about the selected Andersen EV charger

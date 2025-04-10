@@ -10,7 +10,9 @@
 * The lock state is updated almost instantly, other sensors are refreshed on a 60 second cycle.
 * Uses [@iandbird's](https://github.com/IanDBird/konnect) baseline Python module and slightly modifies it to suit some additional sensors.
 * Implements automatic token refresh to maintain persistent connections to the Andersen EV API.
-* Provides a service to disable all charging schedules: `andersen_ev.disable_all_schedules`
+* Provides services to:
+  * Disable all charging schedules: `andersen_ev.disable_all_schedules`
+  * Get detailed device information: `andersen_ev.get_device_info` (results displayed in UI)
 
 ## Installation
 Sorry, no HACS just yet. It may come.
@@ -33,13 +35,25 @@ data:
   device_id: "YOUR_DEVICE_ID"
 ```
 
+### get_device_info
+Retrieves detailed information about a device and displays the results directly in the Home Assistant UI. This service uses Home Assistant's new Action API that allows returning data to the user interface.
+
+Example:
+```yaml
+service: andersen_ev.get_device_info
+data:
+  device_id: "YOUR_DEVICE_ID"
+```
+
 ## Future development
 Frankly depends on whether or not I sell my house (with the charger).
 
 ## Changelog
 
 ### 0.4.0
-* Added a service to disable all charging schedules: `andersen_ev.disable_all_schedules`
+* Added services:
+  * `disable_all_schedules` - Disables all charging schedules for a charge point
+  * `get_device_info` - Retrieves detailed device information with results displayed in UI
 * Removed redundant enable/disable charging services (use the lock entity instead)
 
 ### 0.3.0

@@ -57,7 +57,7 @@ async def async_setup_entry(
         ))
         entities.append(AndersenEvChargeStatusSensor(
             coordinator, device, "charge_power_max", "Max Charge Power", "chargePowerMax",
-            SensorDeviceClass.POWER, SensorStateClass.MEASUREMENT, UnitOfPower.WATT
+            SensorDeviceClass.POWER, SensorStateClass.MEASUREMENT, UnitOfPower.KILO_WATT
         ))
         entities.append(AndersenEvChargeStatusSensor(
             coordinator, device, "solar_power", "Solar Power", "solarPower",

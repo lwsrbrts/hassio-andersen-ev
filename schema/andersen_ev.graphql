@@ -456,7 +456,6 @@ query getDeviceStatus($id: ID!) {
       sysGridEnergyDelta
       cfgChargeAmpMin
       cfgChargeAmpMax
-
       solarMaxGridChargePercent
       solarChargeAlways
       solarOverride

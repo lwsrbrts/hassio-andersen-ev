@@ -2,7 +2,7 @@
 
 ## Status
 
-### Beta 0.4.0.
+### Beta 0.4.1.
 
 ## Features
 * Developed on an Andersen A2 device installed in 2019.
@@ -10,9 +10,11 @@
 * The lock state is updated almost instantly, other sensors are refreshed on a 60 second cycle.
 * Uses [@iandbird's](https://github.com/IanDBird/konnect) baseline Python module and slightly modifies it to suit some additional sensors.
 * Implements automatic token refresh to maintain persistent connections to the Andersen EV API.
+* All sensors feature custom Material Design icons for better visual distinction in the Home Assistant dashboard.
 * Provides services to:
   * Disable all charging schedules: `andersen_ev.disable_all_schedules`
   * Get detailed device information: `andersen_ev.get_device_info` (results displayed in UI)
+  * Get detailed real-time device status: `andersen_ev.get_device_status` (results displayed in UI)
 
 ## Installation
 Sorry, no HACS just yet. It may come.
@@ -45,16 +47,33 @@ data:
   device_id: "YOUR_DEVICE_ID"
 ```
 
+### get_device_status
+Retrieves detailed real-time status of a device and displays the results directly in the Home Assistant UI. This provides more comprehensive status information than what is available through the sensors.
+
+Example:
+```yaml
+service: andersen_ev.get_device_status
+data:
+  device_id: "YOUR_DEVICE_ID"
+```
+
 ## Future development
 Frankly depends on whether or not I sell my house (with the charger).
 
 ## Changelog
 
+### 0.4.1
+* Added custom Material Design icons for all sensors
+* Added service:
+  * `get_device_status` - Retrieves detailed real-time device status with results displayed in UI
+
 ### 0.4.0
 * Added services:
   * `disable_all_schedules` - Disables all charging schedules for a charge point
   * `get_device_info` - Retrieves detailed device information with results displayed in UI
+  * `get_device_status` - Retrieves detailed real-time device status with results displayed in UI
 * Removed redundant enable/disable charging services (use the lock entity instead)
+* Changed power sensors to display in kilowatts (kW) to match API values
 
 ### 0.3.0
 * Implemented automatic token refresh to fix the "No devices found" issue after 1 hour

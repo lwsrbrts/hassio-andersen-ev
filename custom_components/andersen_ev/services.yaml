@@ -24,3 +24,18 @@ get_device_info:
   response:
     name: Device Information
     description: Returns detailed information about the selected Andersen EV charger
+
+get_device_status:
+  name: Get Device Status
+  description: Get detailed real-time status of an Andersen EV charge point with results displayed in the UI
+  fields:
+    device_id:
+      name: Device ID
+      description: The ID of the Andersen EV device to get status for
+      required: true
+      example: "12345-67890"
+      selector:
+        text: {}
+  response:
+    name: Device Status
+    description: Returns detailed real-time status information about the selected Andersen EV charger

@@ -130,7 +130,11 @@ query getDevice($id: ID!) {
     }
     deviceInfo {
       id
+      currency
+      enableThreePhaseMultiplier
       friendlyName
+      locationLongitude
+      locationLatitude
       schedule0Name
       schedule1Name
       schedule2Name
@@ -141,7 +145,116 @@ query getDevice($id: ID!) {
       addressDistrict
       addressPostcode
       addressCountry
+      solarOverrideStart
+      notifyRcmErrorEnabled
+      notifyWeeklyReportEnabled
+      notifyDeviceOfflineEnabled
+      purpose
+      solarChargeAlways
       timeZoneRegion
+      userLock
+    }
+  }
+}
+'''
+
+GRAPHQL_DEVICE_STATUS_DETAILED_QUERY = '''
+query getDeviceStatus($id: ID!) {
+  getDevice(id: $id) {
+    deviceStatus {
+      id
+      konnectSerial
+      online
+      lastEvent
+      lastEventAge
+      evseState
+      evseResponseTime
+      evseChargeAmpCurrentLimit
+      sysSchEnabled
+      sysUserLock
+      sysScheduleLock
+      sysRssi
+      sysSSID
+      sysLan
+      sysTemperature
+      sysFreeMemory
+      sysRuntime
+      sysFwVersion
+      sysHwVersion
+      evseFwVersion
+      evseHwVersion
+      sysBootup
+      sysOs
+      sysProductId
+      sysProductName
+      sysOtaUpdate
+      sysRcmUserCleared
+      sysButton
+      sysFaultCode
+      sysVoltageA
+      sysVoltageB
+      sysVoltageC
+      sysAmpA
+      sysAmpB
+      sysAmpC
+      sysPowerA
+      sysPowerB
+      sysPowerC
+      sysPhase
+      sysSolarCT
+      sysGridCT
+      sysAdaptiveFuse
+      sysTime
+      sysSch0
+      sysSch1
+      sysSch2
+      sysSch3
+      sysSch4
+      cfgPENEarthConnected
+      cfgDebugEnable
+      cfgChargeAmpMax
+      cfgChargeAmpMin
+      cfgDSTActive
+      sysChargingEnabled
+      sysSchSet
+      sysSolarPower
+      sysGridPower
+      sysChargePower
+      sysSolarEnergyDelta
+      sysGridEnergyDelta
+      solarMaxGridChargePercent
+      solarChargeAlways
+      solarOverride
+      cfgAFEnable
+      cfgAFAmpMax
+      cfgCTConfig
+      chargeStatus {
+        start
+        chargeEnergyTotal
+        solarEnergyTotal
+        gridEnergyTotal
+        chargePower
+        chargePowerMax
+        solarPower
+        gridPower
+        duration
+      }
+      scheduleSlotsArray {
+        startHour
+        startMinute
+        endHour
+        endMinute
+        enabled
+        dayMap {
+          monday
+          tuesday
+          wednesday
+          thursday
+          friday
+          saturday
+          sunday
+        }
+      }
     }
   }
 }

@@ -315,3 +315,48 @@ class KonnectDevice:
         except Exception as err:
             _LOGGER.error(f"Error getting device info: {err}")
             return None
+
+    async def getDetailedDeviceStatus(self):
+        """Get the detailed status of the device."""
+        _LOGGER.debug(f"Fetching detailed status for device {self.device_id} ({self.friendly_name})")
+        
+        # Ensure we have a valid token before making the request
+        await self.api.ensure_valid_auth()
+        
+        url = const.GRAPHQL_URL
+        body = {
+            'operationName': 'getDeviceStatus',
+            'variables': { 'id': self.device_id },
+            'query': const.GRAPHQL_DEVICE_STATUS_DETAILED_QUERY
+        }
+
+        # Run blocking requests call in an executor to avoid blocking the event loop
+        try:
+            response = await asyncio.get_event_loop().run_in_executor(
+                None,
+                lambda: requests.post(url, json=body, auth=BearerAuth(self.api.token))
+            )
+            
+            if response.status_code == 401:
+                # Token expired, refresh and retry
+                _LOGGER.debug("Authentication token expired during detailed device status request, refreshing")
+                await self.api.refresh_token()
+                return await self.getDetailedDeviceStatus()
+                
+            if response.status_code != 200:
+                _LOGGER.warning(f"Failed to get detailed device status, status code: {response.status_code}")
+                return None
+                
+            response_body = response.json()
+            if 'data' not in response_body or 'getDevice' not in response_body['data'] or 'deviceStatus' not in response_body['data']['getDevice']:
+                _LOGGER.warning("Invalid response format from detailed device status request")
+                return None
+            
+            device_status = response_body['data']['getDevice']['deviceStatus']
+            _LOGGER.debug(f"Successfully retrieved detailed status for {self.friendly_name}")
+            
+            return device_status
+            
+        except Exception as err:
+            _LOGGER.error(f"Error getting detailed device status: {err}")
+            return None

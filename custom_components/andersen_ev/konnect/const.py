@@ -47,6 +47,7 @@ query getDeviceCalculatedChargeLogs($id: ID!, $limit: Int, $offset: Int, $minEne
 GRAPHQL_DEVICE_STATUS_QUERY = '''
 query getDeviceStatusSimple($id: ID!) {
   getDevice(id: $id) {
+    name
     deviceStatus {
       id
       online

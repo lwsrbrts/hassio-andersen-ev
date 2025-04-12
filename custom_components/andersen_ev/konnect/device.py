@@ -12,6 +12,7 @@ class KonnectDevice:
     friendly_name = None
     user_lock = False
     _last_status = None
+    model_name = None  # Add this line for the model name
 
     def __init__(self, api, device_id, friendly_name, user_lock):
         self.api = api
@@ -19,6 +20,7 @@ class KonnectDevice:
         self.friendly_name = friendly_name
         self.user_lock = user_lock
         self._last_status = None
+        self.model_name = None  # Initialize model_name property
 
     async def enable(self):
         """Enable charging by unlocking user lock."""
@@ -181,6 +183,11 @@ class KonnectDevice:
             if 'data' not in response_body or 'getDevice' not in response_body['data'] or 'deviceStatus' not in response_body['data']['getDevice']:
                 _LOGGER.warning("Invalid response format from device status request")
                 return None
+            
+            # Store the model name if available (this is the "name" property from the API)
+            if 'name' in response_body['data']['getDevice']:
+                self.model_name = response_body['data']['getDevice']['name']
+                _LOGGER.debug(f"Model name for device {self.friendly_name}: {self.model_name}")
             
             # Store the last status for reference in the lock entity
             status = response_body['data']['getDevice']['deviceStatus']

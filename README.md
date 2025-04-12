@@ -2,7 +2,7 @@
 
 ## Status
 
-### Beta 0.4.1.
+### Beta 0.4.2.
 
 ## Features
 * Developed on an Andersen A2 device installed in 2019.
@@ -61,6 +61,10 @@ data:
 Frankly depends on whether or not I sell my house (with the charger).
 
 ## Changelog
+
+### 0.4.2
+* Improved model name handling by properly retrieving it from the API response
+* Fixed issue with device model display in Home Assistant
 
 ### 0.4.1
 * Added custom Material Design icons for all sensors

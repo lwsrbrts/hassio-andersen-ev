@@ -119,7 +119,11 @@ class AndersenEvBaseSensor(CoordinatorEntity, SensorEntity):
 
     def _update_model_from_device_status(self):
         """Update model information from device status if available."""
-        if hasattr(self._device, '_last_status') and self._device._last_status:
+        # First try to use the model name from the API if available
+        if hasattr(self._device, 'model_name') and self._device.model_name:
+            self._attr_device_info["model"] = self._device.model_name
+        # Fall back to the information from device status
+        elif hasattr(self._device, '_last_status') and self._device._last_status:
             status = self._device._last_status
             if "sysProductName" in status:
                 self._attr_device_info["model"] = status["sysProductName"]
@@ -221,7 +225,11 @@ class AndersenEvConnectorSensor(CoordinatorEntity, SensorEntity):
     
     def _update_model_from_device_status(self):
         """Update model information from device status if available."""
-        if hasattr(self._device, '_last_status') and self._device._last_status:
+        # First try to use the model name from the API if available
+        if hasattr(self._device, 'model_name') and self._device.model_name:
+            self._attr_device_info["model"] = self._device.model_name
+        # Fall back to the information from device status
+        elif hasattr(self._device, '_last_status') and self._device._last_status:
             status = self._device._last_status
             if "sysProductName" in status:
                 self._attr_device_info["model"] = status["sysProductName"]
@@ -331,7 +339,11 @@ class AndersenEvChargeStatusSensor(CoordinatorEntity, SensorEntity):
     
     def _update_model_from_device_status(self):
         """Update model information from device status if available."""
-        if hasattr(self._device, '_last_status') and self._device._last_status:
+        # First try to use the model name from the API if available
+        if hasattr(self._device, 'model_name') and self._device.model_name:
+            self._attr_device_info["model"] = self._device.model_name
+        # Fall back to the information from device status
+        elif hasattr(self._device, '_last_status') and self._device._last_status:
             status = self._device._last_status
             if "sysProductName" in status:
                 self._attr_device_info["model"] = status["sysProductName"]

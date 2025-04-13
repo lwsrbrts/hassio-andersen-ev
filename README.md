@@ -73,13 +73,12 @@ Frankly depends on whether or not I sell my house (with the charger).
 ### 0.4.1
 * Added custom Material Design icons for all sensors
 * Added service:
-  * `get_device_status` - Retrieves detailed real-time device status with results displayed in UI
+  * `get_device_status` - Retrieves detailed real-time device status with results displayed in UI - enables use of response variables.
 
 ### 0.4.0
 * Added services:
   * `disable_all_schedules` - Disables all charging schedules for a charge point
-  * `get_device_info` - Retrieves detailed device information with results displayed in UI
-  * `get_device_status` - Retrieves detailed real-time device status with results displayed in UI
+  * `get_device_info` - Retrieves detailed device information with results displayed in UI - enables use of response variables.
 * Removed redundant enable/disable charging services (use the lock entity instead)
 * Changed power sensors to display in kilowatts (kW) to match API values
 

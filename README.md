@@ -4,7 +4,7 @@
 
 ## Status
 
-### Beta 0.5.0
+### Beta 0.5.1
 
 ## Features
 * Switch entities for each charging schedule allows enabling/disabling charge schedules.
@@ -59,6 +59,10 @@ data:
 Frankly depends on whether or not I sell my house (with the charger).
 
 ## Changelog
+
+### 0.5.1
+* Add serial number to device
+* Added icons to HA brands repo (and included here).
 
 ### 0.5.0
 * Added switch entities to enable/disable individual charging schedules

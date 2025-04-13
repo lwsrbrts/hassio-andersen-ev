@@ -1,17 +1,14 @@
 # Andersen EV Chargepoint integration for Home Assistant
 
+![Andersen Logo](images/logo.png)
+
 ## Status
 
-### Beta 0.5.0.
+### Beta 0.5.0
 
 ## Features
-* Developed on an Andersen A2 device installed in 2019.
-* The primary feature of this integration is that it implements a Home Assistant lock for the Andersen A2. It also pulls some useful sensors from the API using a GraphQL query. I personally don't get good results from these sensors but then, I never have from the mobile app either. 🤷🏻
-* Switch entities for each charging schedule allow controlling schedule activation directly from Home Assistant.
-* The lock and switch states are updated almost instantly, other sensors are refreshed on a 60 second cycle.
-* Uses [@iandbird's](https://github.com/IanDBird/konnect) baseline Python module and slightly modifies it to suit some additional sensors.
-* Implements automatic token refresh to maintain persistent connections to the Andersen EV API.
-* All sensors feature custom Material Design icons for better visual distinction in the Home Assistant dashboard.
+* Switch entities for each charging schedule allows enabling/disabling charge schedules.
+* Lock entity to enable or disable the charge point.
 * Provides services to:
   * Disable all charging schedules: `andersen_ev.disable_all_schedules`
   * Get detailed device information: `andersen_ev.get_device_info` (results displayed in UI)
@@ -94,3 +91,8 @@ Frankly depends on whether or not I sell my house (with the charger).
 
 ### 0.2.0
 * Initial release
+
+## Acknowledgements
+
+ * [@iandbird](https://github.com/IanDBird/konnect) - uses the Konnect module as a baseline with my own modifications.
+ * [@strobejb](https://github.com/strobejb/andersen-ev) - (indirectly) uses his GraphQL schema in development of API communication.

@@ -44,6 +44,7 @@ class AndersenEvLock(CoordinatorEntity, LockEntity):
             name=f"{device.friendly_name} ({device.device_id})",
             manufacturer="Andersen EV",
             model="A2",  # Default model, will be updated if available from device status
+            serial_number=f"{device.device_id}"
         )
         # Update model if device status is already available
         self._update_model_from_device_status()

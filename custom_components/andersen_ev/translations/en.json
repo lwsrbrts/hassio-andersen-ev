@@ -3,7 +3,7 @@
     "step": {
       "user": {
         "title": "Connect to Andersen EV",
-        "description": "Set up your Andersen EV A2 charger to integrate with Home Assistant",
+        "description": "Set up your Andersen EV charger to integrate with Home Assistant.",
         "data": {
           "email": "Email",
           "password": "Password"

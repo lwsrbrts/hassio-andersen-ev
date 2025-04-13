@@ -28,7 +28,7 @@ from .const import (
     SERVICE_GET_DEVICE_STATUS
 )
 
-PLATFORMS = [Platform.LOCK, Platform.SENSOR]
+PLATFORMS = [Platform.LOCK, Platform.SENSOR, Platform.SWITCH]
 
 _LOGGER = logging.getLogger(__name__)
 

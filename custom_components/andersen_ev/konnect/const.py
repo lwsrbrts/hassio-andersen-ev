@@ -70,6 +70,22 @@ query getDeviceStatusSimple($id: ID!) {
         gridPower
         duration
       }
+      scheduleSlotsArray {
+        startHour
+        startMinute
+        endHour
+        endMinute
+        enabled
+        dayMap {
+          monday
+          tuesday
+          wednesday
+          thursday
+          friday
+          saturday
+          sunday
+        }
+      }
     }
   }
 }

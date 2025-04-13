@@ -2,12 +2,13 @@
 
 ## Status
 
-### Beta 0.4.2.
+### Beta 0.5.0.
 
 ## Features
 * Developed on an Andersen A2 device installed in 2019.
 * The primary feature of this integration is that it implements a Home Assistant lock for the Andersen A2. It also pulls some useful sensors from the API using a GraphQL query. I personally don't get good results from these sensors but then, I never have from the mobile app either. 🤷🏻
-* The lock state is updated almost instantly, other sensors are refreshed on a 60 second cycle.
+* Switch entities for each charging schedule allow controlling schedule activation directly from Home Assistant.
+* The lock and switch states are updated almost instantly, other sensors are refreshed on a 60 second cycle.
 * Uses [@iandbird's](https://github.com/IanDBird/konnect) baseline Python module and slightly modifies it to suit some additional sensors.
 * Implements automatic token refresh to maintain persistent connections to the Andersen EV API.
 * All sensors feature custom Material Design icons for better visual distinction in the Home Assistant dashboard.
@@ -61,6 +62,12 @@ data:
 Frankly depends on whether or not I sell my house (with the charger).
 
 ## Changelog
+
+### 0.5.0
+* Added switch entities to enable/disable individual charging schedules
+* Improved schedule control to sync changes between Home Assistant and the mobile app
+* Fixed state synchronization when toggling switches or making changes in the mobile app
+* Added better error handling for API communications
 
 ### 0.4.2
 * Improved model name handling by properly retrieving it from the API response

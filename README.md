@@ -4,7 +4,7 @@
 
 ## Status
 
-### Beta 0.5.1
+### Beta 0.5.2
 
 ## Features
 * Switch entities for each charging schedule allows enabling/disabling charge schedules.
@@ -59,6 +59,9 @@ data:
 Frankly depends on whether or not I sell my house (with the charger).
 
 ## Changelog
+
+### 0.5.2
+* Bugfix missing model data in `lock.py`
 
 ### 0.5.1
 * Add serial number to device

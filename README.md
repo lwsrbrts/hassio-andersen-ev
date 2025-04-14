@@ -1,6 +1,6 @@
 # Andersen EV Chargepoint integration for Home Assistant
 
-![Andersen Logo](custom_components/andersen_ev/images/dark_logo.png)
+![Andersen Logo](/images/dark_logo.png)
 
 ## Status
 

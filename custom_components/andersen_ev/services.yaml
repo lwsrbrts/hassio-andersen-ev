@@ -6,7 +6,7 @@ disable_all_schedules:
       name: Device ID
       description: The ID of the Andersen EV device to disable schedules for
       required: true
-      example: "12345-67890"
+      example: "1b6f9e38a4d72c0f5e831649"
       selector:
         text: {}
 
@@ -18,7 +18,7 @@ get_device_info:
       name: Device ID
       description: The ID of the Andersen EV device to get information for
       required: true
-      example: "12345-67890"
+      example: "1b6f9e38a4d72c0f5e831649"
       selector:
         text: {}
   response:
@@ -27,15 +27,15 @@ get_device_info:
 
 get_device_status:
   name: Get Device Status
-  description: Get detailed real-time status of an Andersen EV charge point with results displayed in the UI
+  description: Get detailed status of an Andersen EV charge point with results displayed in the UI
   fields:
     device_id:
       name: Device ID
       description: The ID of the Andersen EV device to get status for
       required: true
-      example: "12345-67890"
+      example: "1b6f9e38a4d72c0f5e831649"
       selector:
         text: {}
   response:
     name: Device Status
-    description: Returns detailed real-time status information about the selected Andersen EV charger
+    description: Returns detailed status for the selected Andersen EV charger

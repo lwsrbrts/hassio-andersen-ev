@@ -2,6 +2,7 @@
   "domain": "andersen_ev",
   "name": "Andersen EV",
   "documentation": "https://github.com/lwsrbrts/hassio-andersen-ev",
+  "issue_tracker": "https://github.com/lwsrbrts/hassio-andersen-ev/issues",
   "dependencies": [],
   "codeowners": ["@lwsrbrts"],
   "requirements": ["warrant", "aiohttp"],

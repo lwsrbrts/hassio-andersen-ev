@@ -15,7 +15,21 @@
   * Get detailed real-time device status: `andersen_ev.get_device_status` (results displayed in UI)
 
 ## Installation
-Sorry, no HACS just yet. It may come.
+
+### HACS (Recommended)
+
+1. Make sure [HACS](https://hacs.xyz/) is installed in your Home Assistant instance.
+2. Add this repository as a custom repository in HACS:
+   - Navigate to HACS → Integrations → Menu (⋮) → Custom repositories
+   - Add `https://github.com/lwsrbrts/hassio-andersen-ev` as a repository
+   - Select `Integration` as the category
+3. Click "Add"
+4. Search for "Andersen EV" in HACS and install it
+5. Restart Home Assistant
+6. Add the integration via the Home Assistant UI (Settings → Devices & Services → Add Integration)
+7. Search for "Andersen EV" and follow the configuration steps
+
+### Manual Installation
 
 1. Download the repository as a zip file and extract it.
 2. Copy the `andersen_ev` folder to your Home Assistant `custom_components` directory.

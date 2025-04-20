@@ -1,0 +1,8 @@
+{
+  "name": "Andersen EV",
+  "content_in_root": false,
+  "render_readme": true,
+  "homeassistant": "2025.3.0",
+  "domains": ["switch", "lock", "sensor"],
+  "country": ["GB", "FR", "DE", "NL", "NO", "SE", "DK", "FI"]
+}

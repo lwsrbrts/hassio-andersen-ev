@@ -195,7 +195,7 @@ class AndersenEvCoordinator(DataUpdateCoordinator):
                 
                 # Fetch and log device status
                 try:
-                    device_status = await device.getDeviceStatus()
+                    device_status = await device.getDetailedDeviceStatus()
                     if device_status:
                         _LOGGER.debug(f"Device Status for {device.friendly_name}: evseState={device_status.get('evseState')}, online={device_status.get('online')}, charging={device_status.get('sysChargingEnabled')}, locked={device_status.get('sysUserLock')}")
                 except Exception as status_err:

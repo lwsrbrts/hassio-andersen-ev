@@ -4,7 +4,7 @@
 
 ## Status
 
-### Beta 0.5.2
+### Beta 0.6.0
 
 ## Features
 * Switch entities for each charging schedule allows enabling/disabling charge schedules.
@@ -13,6 +13,7 @@
   * Disable all charging schedules: `andersen_ev.disable_all_schedules`
   * Get detailed device information: `andersen_ev.get_device_info` (results displayed in UI)
   * Get detailed real-time device status: `andersen_ev.get_device_status` (results displayed in UI)
+  * Live grid power sensors for those without smart meters.
 
 ## Installation
 
@@ -73,6 +74,9 @@ data:
 Frankly depends on whether or not I sell my house (with the charger).
 
 ## Changelog
+
+### 0.6.0
+* First contribution from [@codeandr3w](https://github.com/codeandr3w) adds live grid power sensors.
 
 ### 0.5.2
 * Bugfix missing model data in `lock.py`

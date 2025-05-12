@@ -13,7 +13,7 @@
   * Disable all charging schedules: `andersen_ev.disable_all_schedules`
   * Get detailed device information: `andersen_ev.get_device_info` (results displayed in UI)
   * Get detailed real-time device status: `andersen_ev.get_device_status` (results displayed in UI)
-  * Live grid power sensors for those without smart meters.
+* Live grid power sensors for those without smart meters.
 
 ## Installation
 

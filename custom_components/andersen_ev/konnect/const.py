@@ -178,6 +178,7 @@ query getDevice($id: ID!) {
 GRAPHQL_DEVICE_STATUS_DETAILED_QUERY = '''
 query getDeviceStatus($id: ID!) {
   getDevice(id: $id) {
+    name
     deviceStatus {
       id
       konnectSerial

@@ -346,12 +346,12 @@ class KonnectDevice:
             
             if response.status_code == 401:
                 # Token expired, refresh and retry
-                _LOGGER.debug("Authentication token expired during detailed device status request, refreshing")
+                _LOGGER.debug("Authentication token expired during status request, refreshing")
                 await self.api.refresh_token()
-                return await self.getDetailedDeviceStatus()
+                return await self.getDeviceStatus()
                 
             if response.status_code != 200:
-                _LOGGER.warning(f"Failed to get detailed device status, status code: {response.status_code}")
+                _LOGGER.warning(f"Failed to get device status, status code: {response.status_code}")
                 return None
                 
             response_body = response.json()
@@ -359,11 +359,32 @@ class KonnectDevice:
                 _LOGGER.warning("Invalid response format from detailed device status request")
                 return None
             
-            device_status = response_body['data']['getDevice']['deviceStatus']
-            _LOGGER.debug(f"Successfully retrieved detailed status for {self.friendly_name}")
+            # Store the model name if available (this is the "name" property from the API)
+            if 'name' in response_body['data']['getDevice']:
+                self.model_name = response_body['data']['getDevice']['name']
+                _LOGGER.debug(f"Model name for device {self.friendly_name}: {self.model_name}")
             
-            return device_status
+            # Store the last status for reference in the lock entity
+            status = response_body['data']['getDevice']['deviceStatus']
+            
+            # Log changes to important status values
+            log_changes = False
+            if self._last_status and 'evseState' in status and 'evseState' in self._last_status:
+                if status['evseState'] != self._last_status['evseState']:
+                    _LOGGER.info(f"Device {self.friendly_name}: EVSE state changed from {self._last_status['evseState']} to {status['evseState']}")
+                    log_changes = True
+                    
+            if self._last_status and 'online' in status and 'online' in self._last_status:
+                if status['online'] != self._last_status['online']:
+                    _LOGGER.info(f"Device {self.friendly_name}: Online state changed from {self._last_status['online']} to {status['online']}")
+                    log_changes = True
+                    
+            if log_changes:
+                _LOGGER.debug(f"Full detailed status for {self.friendly_name}: {status}")
+                
+            self._last_status = status
+            return status
             
         except Exception as err:
-            _LOGGER.error(f"Error getting detailed device status: {err}")
+            _LOGGER.error(f"Error getting device status: {err}")
             return None

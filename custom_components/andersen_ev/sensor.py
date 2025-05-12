@@ -17,6 +17,8 @@ from homeassistant.const import (
     UnitOfEnergy,
     UnitOfPower,
     UnitOfTime,
+    UnitOfTemperature,
+    UnitOfElectricPotential
 )
 
 from . import AndersenEvCoordinator
@@ -39,6 +41,23 @@ async def async_setup_entry(
         entities.append(AndersenEvEnergySensor(coordinator, device, "grid_energy", "Grid Energy", "gridEnergyTotal", "mdi:transmission-tower"))
         entities.append(AndersenEvEnergySensor(coordinator, device, "solar_energy", "Solar Energy", "solarEnergyTotal", "mdi:solar-power"))
         entities.append(AndersenEvEnergySensor(coordinator, device, "surplus_energy", "Surplus Energy", "surplusUsedEnergyTotal", "mdi:battery-plus"))
+
+        entities.append(AndersenEvLiveSensor(
+            coordinator, device, "sys_grid_power", "System Grid Power", "sysGridPower",
+            SensorDeviceClass.POWER, SensorStateClass.MEASUREMENT, UnitOfPower.KILO_WATT, "mdi:transmission-tower"
+        ))
+        entities.append(AndersenEvLiveSensor(
+            coordinator, device, "sys_temperature", "System Temperature", "sysTemperature",
+            SensorDeviceClass.TEMPERATURE, SensorStateClass.MEASUREMENT, UnitOfTemperature.CELSIUS, "mdi:temperature-celsius"
+        ))
+        entities.append(AndersenEvLiveSensor(
+            coordinator, device, "sys_voltage", "System Voltage", "sysVoltageC",
+            SensorDeviceClass.VOLTAGE, SensorStateClass.MEASUREMENT, UnitOfElectricPotential.VOLT, "mdi:transmission-tower"
+        ))
+        entities.append(AndersenEvLiveSensor(
+            coordinator, device, "sys_grid_energy_delta", "System Grid Energy Delta", "sysGridEnergyDelta",
+            SensorDeviceClass.POWER, SensorStateClass.MEASUREMENT, UnitOfEnergy.KILO_WATT_HOUR, "mdi:transmission-tower"
+        ))
         
         # Create cost sensors from historical data
         entities.append(AndersenEvCostSensor(coordinator, device, "cost", "Total Cost", "chargeCostTotal", "mdi:currency-gbp"))
@@ -299,7 +318,7 @@ class AndersenEvConnectorSensor(CoordinatorEntity, SensorEntity):
             
             # This will make the connector sensor more responsive
             # by getting the most up-to-date status directly from the API
-            status = await self._device.getDeviceStatus()
+            status = await self._device.getDetailedDeviceStatus()
             if status and 'evseState' in status:
                 evse_state = status['evseState']
                 if self._last_evse_state != evse_state:
@@ -401,6 +420,104 @@ class AndersenEvChargeStatusSensor(CoordinatorEntity, SensorEntity):
             
             # This will make the sensors more responsive
             # by getting the most up-to-date status directly from the API
-            await self._device.getDeviceStatus()
+            await self._device.getDetailedDeviceStatus()
         except Exception as err:
             _LOGGER.debug(f"Error updating charge status sensor: {err}")
+            
+class AndersenEvLiveSensor(CoordinatorEntity, SensorEntity):
+    """Sensor for Andersen EV live status values."""
+
+    def __init__(self, coordinator: AndersenEvCoordinator, device, sensor_type, name_suffix, data_key, 
+                 device_class=None, state_class=None, unit=None, icon=None) -> None:
+        """Initialize the sensor."""
+        super().__init__(coordinator)
+        self._device = device
+        self._sensor_type = sensor_type
+        self._data_key = data_key
+        self._attr_name = f"{device.friendly_name} {name_suffix}"
+        self._attr_unique_id = f"{device.device_id}_{sensor_type}"
+        self._attr_device_info = {
+            "identifiers": {(DOMAIN, device.device_id)},
+            "name": f"{device.friendly_name} ({device.device_id})",
+            "manufacturer": "Andersen EV",
+            "model": "A2",  # Default model, will be updated if available from device status
+        }
+        if device_class:
+            self._attr_device_class = device_class
+        if state_class:
+            self._attr_state_class = state_class
+        if unit:
+            self._attr_native_unit_of_measurement = unit
+        if icon:
+            self._attr_icon = icon
+        self._update_model_from_device_status()
+    
+    def _update_model_from_device_status(self):
+        """Update model information from device status if available."""
+        # First try to use the model name from the API if available
+        if hasattr(self._device, 'model_name') and self._device.model_name:
+            self._attr_device_info["model"] = self._device.model_name
+        # Fall back to the information from device status
+        elif hasattr(self._device, '_last_status') and self._device._last_status:
+            status = self._device._last_status
+            if "sysProductName" in status:
+                self._attr_device_info["model"] = status["sysProductName"]
+            elif "sysProductId" in status:
+                self._attr_device_info["model"] = status["sysProductId"]
+            elif "sysHwVersion" in status:
+                self._attr_device_info["model"] = f"A2 (HW: {status['sysHwVersion']})"
+    
+    @property
+    def available(self) -> bool:
+        """Return if the sensor is available."""
+        # Always available if the coordinator and device are available
+        for device in self.coordinator.data:
+            if device.device_id == self._device.device_id:
+                self._device = device
+                if (hasattr(self._device, '_last_status') and 
+                    self._device._last_status and
+                    self._data_key in self._device._last_status):
+                    _LOGGER.debug(f"Live available for {self._data_key} is {self.coordinator.last_update_success}")
+                    return self.coordinator.last_update_success
+        return False
+    
+    @property
+    def native_value(self) -> float | int | str | None:
+        """Return the sensor value."""
+        # Check if device exists in coordinator data and update reference
+        for device in self.coordinator.data:
+            if device.device_id == self._device.device_id:
+                self._device = device
+                break
+        
+        # Check if the device has charge status information
+        if (hasattr(self._device, '_last_status') and 
+            self._device._last_status and 
+            self._data_key in self._device._last_status):
+            value = self._device._last_status[self._data_key]
+            _LOGGER.debug(f"(Live value for {self._data_key} is {value}")
+            if self._attr_device_class == SensorDeviceClass.TIMESTAMP and isinstance(value, str):
+                try:
+                    return dateutil.parser.isoparse(value)
+                except ValueError:
+                    _LOGGER.debug(f"Error parsing timestamp: {value}")
+                    return None
+            return value
+        return None
+
+    async def async_update(self) -> None:
+        """Update the entity with latest status from coordinator."""
+        await super().async_update()
+        
+        # Force refresh of device status to get the latest data
+        try:
+            # Update model if device status is available
+            self._update_model_from_device_status()
+            
+            # This will make the sensors more responsive
+            # by getting the most up-to-date status directly from the API
+            await self._device.getDetailedDeviceStatus()
+        except Exception as err:
+            _LOGGER.debug(f"Error updating live detailed status sensor: {err}")
+            
+            

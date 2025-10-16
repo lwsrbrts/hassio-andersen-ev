@@ -117,10 +117,12 @@ class KonnectClient:
         _LOGGER.debug("Found %s devices", len(response_body['devices']))
 
         for device in response_body['devices']:
+            # Use "Andersen" as default friendly name if not set or empty
+            friendly_name = device.get('friendlyName') or "Andersen"
             devices.append(KonnectDevice(
                 api = self,
                 device_id = device['id'],
-                friendly_name = device['friendlyName'],
+                friendly_name = friendly_name,
                 user_lock = device['userLock']))
 
         return devices

@@ -55,6 +55,10 @@ async def async_setup_entry(
             SensorDeviceClass.VOLTAGE, SensorStateClass.MEASUREMENT, UnitOfElectricPotential.VOLT, "mdi:transmission-tower"
         ))
         entities.append(AndersenEvLiveSensor(
+            coordinator, device, "sys_fault_code", "Fault Code", "sysFaultCode",
+            None, None, None, "mdi:exclamation"
+        ))
+        entities.append(AndersenEvLiveSensor(
             coordinator, device, "sys_grid_energy_delta", "System Grid Energy Delta", "sysGridEnergyDelta",
             SensorDeviceClass.POWER, SensorStateClass.MEASUREMENT, UnitOfEnergy.KILO_WATT_HOUR, "mdi:transmission-tower"
         ))
@@ -496,7 +500,7 @@ class AndersenEvLiveSensor(CoordinatorEntity, SensorEntity):
             self._data_key in self._device._last_status):
             value = self._device._last_status[self._data_key]
             _LOGGER.debug(f"(Live value for {self._data_key} is {value}")
-            if self._attr_device_class == SensorDeviceClass.TIMESTAMP and isinstance(value, str):
+            if hasattr (self, '_attr_device_class') and self._attr_device_class == SensorDeviceClass.TIMESTAMP and isinstance(value, str):
                 try:
                     return dateutil.parser.isoparse(value)
                 except ValueError:

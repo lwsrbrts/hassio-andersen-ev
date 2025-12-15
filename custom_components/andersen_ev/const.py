@@ -13,6 +13,7 @@ DEFAULT_SCAN_INTERVAL = 60  # seconds
 SERVICE_DISABLE_ALL_SCHEDULES = "disable_all_schedules"
 SERVICE_GET_DEVICE_INFO = "get_device_info"
 SERVICE_GET_DEVICE_STATUS = "get_device_status"
+SERVICE_RCM_RESET = "reset_rcm"
 
 # Storage
 STORAGE_VERSION = 1

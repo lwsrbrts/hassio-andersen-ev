@@ -22,6 +22,16 @@ class KonnectDevice:
         self._last_status = None
         self.model_name = None  # Initialize model_name property
 
+    async def reset_rcm(self):
+        """Reset RCM fault on the device."""
+        _LOGGER.debug(f"Attempting to reset RCM for device {self.device_id} ({self.friendly_name})")
+        success = await self.__runCommand('rcmReset')
+        if success:
+            _LOGGER.debug(f"Successfully reset RCM for device {self.device_id} ({self.friendly_name})")
+        else:
+            _LOGGER.warning(f"Failed to reset RCM for device {self.device_id} ({self.friendly_name})")
+        return success
+
     async def enable(self):
         """Enable charging by unlocking user lock."""
         _LOGGER.debug(f"Attempting to enable charging for device {self.device_id} ({self.friendly_name})")

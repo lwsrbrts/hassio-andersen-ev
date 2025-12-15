@@ -39,3 +39,15 @@ get_device_status:
   response:
     name: Device Status
     description: Returns detailed status for the selected Andersen EV charger
+
+reset_rcm:
+  name: Reset RCM Fault
+  description: Reset the RCM fault on an Andersen EV charge point
+  fields:
+    device_id:
+      name: Device ID
+      description: The ID of the Andersen EV device to reset RCM for
+      required: true
+      example: "1b6f9e38a4d72c0f5e831649"
+      selector:
+        text: {}

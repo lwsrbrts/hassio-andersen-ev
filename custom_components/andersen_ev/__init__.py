@@ -25,7 +25,8 @@ from .const import (
     STORAGE_KEY,
     SERVICE_DISABLE_ALL_SCHEDULES,
     SERVICE_GET_DEVICE_INFO,
-    SERVICE_GET_DEVICE_STATUS
+    SERVICE_GET_DEVICE_STATUS,
+    SERVICE_RCM_RESET
 )
 
 PLATFORMS = [Platform.LOCK, Platform.SENSOR, Platform.SWITCH]
@@ -108,6 +109,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         
         return {"error": f"Device with ID {device_id} not found"}
     
+    async def reset_rcm(call: ServiceCall) -> None:
+        """Reset RCM fault for a device."""
+        device_id = call.data.get(ATTR_DEVICE_ID)
+        devices = coordinator.data
+        
+        for device in devices:
+            if device.device_id == device_id:
+                await device.rcmReset()
+                await coordinator.async_request_refresh()
+                break
+    
     # Register services using simpler schema
     service_schema = vol.Schema({vol.Required(ATTR_DEVICE_ID): str})
     
@@ -123,6 +135,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Register the get_device_status service with response support
     hass.services.async_register(
         DOMAIN, SERVICE_GET_DEVICE_STATUS, get_device_status, schema=service_schema, supports_response=True
+    )
+
+    # Register the reset_rcm service
+    hass.services.async_register(
+        DOMAIN, SERVICE_RCM_RESET, reset_rcm, schema=service_schema
     )
     
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)

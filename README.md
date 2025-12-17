@@ -4,7 +4,7 @@
 
 ## Status
 
-### Beta 0.6.2
+### Beta 0.6.3
 
 ## Features
 * Switch entities for each charging schedule allows enabling/disabling charge schedules.
@@ -74,6 +74,9 @@ data:
 Frankly depends on whether or not I sell my house (with the charger).
 
 ## Changelog
+
+### 0.6.3
+* First contribution from [@devachnid](https://github.com/devachnid) adds a service to perform an RCM reset.
 
 ### 0.6.2
 * Another contribution from [@codeandr3w](https://github.com/codeandr3w) which adds a sensor to report the fault code of the charger.

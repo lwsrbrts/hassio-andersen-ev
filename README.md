@@ -4,7 +4,7 @@
 
 ## Status
 
-### Beta 0.6.3
+### Beta 0.6.4
 
 ## Features
 * Switch entities for each charging schedule allows enabling/disabling charge schedules.
@@ -13,6 +13,7 @@
   * Disable all charging schedules: `andersen_ev.disable_all_schedules`
   * Get detailed device information: `andersen_ev.get_device_info` (results displayed in UI)
   * Get detailed real-time device status: `andersen_ev.get_device_status` (results displayed in UI)
+  * Reset RCM: `andersen_ev.reset_rcm`
 * Live grid power sensors for those without smart meters.
 
 ## Installation

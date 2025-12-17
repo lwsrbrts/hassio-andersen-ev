@@ -75,6 +75,9 @@ Frankly depends on whether or not I sell my house (with the charger).
 
 ## Changelog
 
+### 0.6.4
+* Resolve bug preventing use of the RCM reset service caused by incorrect method name call.
+
 ### 0.6.3
 * First contribution from [@devachnid](https://github.com/devachnid) adds a service to perform an RCM reset.
 

@@ -116,7 +116,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         
         for device in devices:
             if device.device_id == device_id:
-                await device.rcmReset()
+                await device.reset_rcm()
                 await coordinator.async_request_refresh()
                 break
     

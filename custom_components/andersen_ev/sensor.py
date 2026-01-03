@@ -110,6 +110,9 @@ async def async_setup_entry(
             coordinator, device, "session_start", "Session Start Time", "start",
             SensorDeviceClass.TIMESTAMP, None, None, "mdi:clock-start"
         ))
+        
+        # Connection session energy sensor (accumulates from cable connect to disconnect)
+        entities.append(AndersenEvConnectionSessionEnergySensor(coordinator, device))
     
     async_add_entities(entities)
 
@@ -525,3 +528,143 @@ class AndersenEvLiveSensor(CoordinatorEntity, SensorEntity):
             _LOGGER.debug(f"Error updating live detailed status sensor: {err}")
             
             
+class AndersenEvConnectionSessionEnergySensor(CoordinatorEntity, SensorEntity):
+    """Sensor that tracks total energy from cable connection to disconnection."""
+
+    _attr_device_class = SensorDeviceClass.ENERGY
+    _attr_state_class = SensorStateClass.TOTAL
+    _attr_native_unit_of_measurement = UnitOfEnergy.KILO_WATT_HOUR
+
+    def __init__(self, coordinator: AndersenEvCoordinator, device) -> None:
+        """Initialize the sensor."""
+        super().__init__(coordinator)
+        self._device = device
+        self._attr_name = f"{device.friendly_name} Connection Session Energy"
+        self._attr_unique_id = f"{device.device_id}_connection_session_energy"
+        self._attr_icon = "mdi:ev-plug-type2"
+        self._attr_device_info = {
+            "identifiers": {(DOMAIN, device.device_id)},
+            "name": f"{device.friendly_name} ({device.device_id})",
+            "manufacturer": "Andersen EV",
+            "model": "A2",
+        }
+        
+        # Track session state
+        self._accumulated_energy = 0.0
+        self._last_charge_energy = None
+        self._session_active = False
+        self._last_evse_state = None
+        self._is_locked = False
+        
+        self._update_model_from_device_status()
+
+    async def async_added_to_hass(self) -> None:
+        """When entity is added to hass, restore last state."""
+        await super().async_added_to_hass()
+        
+        # Restore previous state if available
+        last_state = await self.async_get_last_state()
+        if last_state and last_state.state not in (None, "unknown", "unavailable"):
+            try:
+                self._accumulated_energy = float(last_state.state)
+                _LOGGER.debug(f"Restored connection session energy: {self._accumulated_energy} kWh for {self._device.friendly_name}")
+            except (ValueError, TypeError):
+                _LOGGER.warning(f"Could not restore state for connection session energy sensor: {last_state.state}")
+                self._accumulated_energy = 0.0
+    
+    def _update_model_from_device_status(self):
+        """Update model information from device status if available."""
+        if hasattr(self._device, 'model_name') and self._device.model_name:
+            self._attr_device_info["model"] = self._device.model_name
+        elif hasattr(self._device, '_last_status') and self._device._last_status:
+            status = self._device._last_status
+            if "sysProductName" in status:
+                self._attr_device_info["model"] = status["sysProductName"]
+            elif "sysProductId" in status:
+                self._attr_device_info["model"] = status["sysProductId"]
+            elif "sysHwVersion" in status:
+                self._attr_device_info["model"] = f"A2 (HW: {status['sysHwVersion']})"
+    
+    @property
+    def available(self) -> bool:
+        """Return if the sensor is available."""
+        for device in self.coordinator.data:
+            if device.device_id == self._device.device_id:
+                self._device = device
+                return self.coordinator.last_update_success
+        return False
+    
+    @property
+    def native_value(self) -> float:
+        """Return the accumulated energy value."""
+        # Update device reference
+        for device in self.coordinator.data:
+            if device.device_id == self._device.device_id:
+                self._device = device
+                break
+        
+        # Check device status and update session state
+        if hasattr(self._device, '_last_status') and self._device._last_status:
+            status = self._device._last_status
+            
+            # Get current evseState and lock status
+            current_evse_state = status.get('evseState')
+            current_locked = status.get('sysUserLock', False)
+            
+            # Check if we need to reset (cable disconnected or locked)
+            if current_evse_state == "1" or current_evse_state == 1 or current_locked:
+                # Cable disconnected or charger locked
+                if self._session_active:
+                    _LOGGER.info(f"Connection session ended for {self._device.friendly_name}. Total energy: {self._accumulated_energy} kWh")
+                    self._session_active = False
+                    self._last_charge_energy = None
+                    # Reset after session ends
+                    self._accumulated_energy = 0.0
+                self._is_locked = current_locked
+            
+            # Check if session is starting (connected or charging)
+            elif current_evse_state in ["2", "3", 2, 3]:
+                # Cable connected or charging
+                if not self._session_active:
+                    _LOGGER.info(f"New connection session started for {self._device.friendly_name}")
+                    self._session_active = True
+                    self._accumulated_energy = 0.0
+                    self._last_charge_energy = None
+                
+                # Accumulate energy if chargeStatus exists
+                if 'chargeStatus' in status and 'chargeEnergyTotal' in status['chargeStatus']:
+                    current_charge_energy = status['chargeStatus']['chargeEnergyTotal']
+                    
+                    if current_charge_energy is not None:
+                        if self._last_charge_energy is None:
+                            # First reading in this session
+                            self._accumulated_energy = current_charge_energy
+                            _LOGGER.debug(f"Initial charge energy: {current_charge_energy} kWh for {self._device.friendly_name}")
+                        elif current_charge_energy < self._last_charge_energy:
+                            # Energy counter reset (new charge cycle in same connection)
+                            # Add the previous cycle's energy and start tracking the new cycle
+                            self._accumulated_energy += self._last_charge_energy
+                            self._accumulated_energy += current_charge_energy
+                            _LOGGER.info(f"Charge cycle reset detected. Accumulated energy: {self._accumulated_energy} kWh for {self._device.friendly_name}")
+                        else:
+                            # Normal progression - use the latest value
+                            # The difference from last reading plus previously accumulated
+                            energy_delta = current_charge_energy - (self._last_charge_energy or 0)
+                            if self._last_charge_energy is not None and energy_delta > 0:
+                                self._accumulated_energy += energy_delta
+                        
+                        self._last_charge_energy = current_charge_energy
+            
+            self._last_evse_state = current_evse_state
+        
+        return round(self._accumulated_energy, 3)
+
+    async def async_update(self) -> None:
+        """Update the entity with latest status from coordinator."""
+        await super().async_update()
+        
+        try:
+            self._update_model_from_device_status()
+            await self._device.getDetailedDeviceStatus()
+        except Exception as err:
+            _LOGGER.debug(f"Error updating connection session energy sensor: {err}")

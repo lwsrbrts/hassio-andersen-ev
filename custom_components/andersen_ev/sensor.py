@@ -8,6 +8,7 @@ from homeassistant.components.sensor import (
     SensorDeviceClass,
     SensorEntity,
     SensorStateClass,
+    RestoreEntity,
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
@@ -528,7 +529,7 @@ class AndersenEvLiveSensor(CoordinatorEntity, SensorEntity):
             _LOGGER.debug(f"Error updating live detailed status sensor: {err}")
             
             
-class AndersenEvConnectionSessionEnergySensor(CoordinatorEntity, SensorEntity):
+class AndersenEvConnectionSessionEnergySensor(CoordinatorEntity, RestoreEntity, SensorEntity):
     """Sensor that tracks total energy from cable connection to disconnection."""
 
     _attr_device_class = SensorDeviceClass.ENERGY

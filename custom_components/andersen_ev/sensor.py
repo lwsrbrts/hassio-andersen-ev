@@ -637,22 +637,16 @@ class AndersenEvConnectionSessionEnergySensor(CoordinatorEntity, RestoreEntity, 
                     current_charge_energy = status['chargeStatus']['chargeEnergyTotal']
                     
                     if current_charge_energy is not None:
+                        # Sum all readings within the session
+                        # If this is a new reading (different from last), add it to the total
                         if self._last_charge_energy is None:
                             # First reading in this session
-                            self._accumulated_energy = current_charge_energy
-                            _LOGGER.debug(f"Initial charge energy: {current_charge_energy} kWh for {self._device.friendly_name}")
-                        elif current_charge_energy < self._last_charge_energy:
-                            # Energy counter reset (new charge cycle in same connection)
-                            # Add the previous cycle's energy and start tracking the new cycle
-                            self._accumulated_energy += self._last_charge_energy
                             self._accumulated_energy += current_charge_energy
-                            _LOGGER.info(f"Charge cycle reset detected. Accumulated energy: {self._accumulated_energy} kWh for {self._device.friendly_name}")
-                        else:
-                            # Normal progression - use the latest value
-                            # The difference from last reading plus previously accumulated
-                            energy_delta = current_charge_energy - (self._last_charge_energy or 0)
-                            if self._last_charge_energy is not None and energy_delta > 0:
-                                self._accumulated_energy += energy_delta
+                            _LOGGER.debug(f"Initial charge energy: {current_charge_energy} kWh, total: {self._accumulated_energy} kWh for {self._device.friendly_name}")
+                        elif current_charge_energy != self._last_charge_energy:
+                            # New reading - add it to accumulated total
+                            self._accumulated_energy += current_charge_energy
+                            _LOGGER.debug(f"Added energy reading: {current_charge_energy} kWh, total: {self._accumulated_energy} kWh for {self._device.friendly_name}")
                         
                         self._last_charge_energy = current_charge_energy
             

@@ -1,0 +1,360 @@
+"""
+Andersen EV GraphQL API schema.
+
+Client-side type definitions derived from the Andersen EV Konnect API.
+Used by the gql DSLSchema for type-safe dynamic query building.
+"""
+
+scalar Date
+
+enum LogsGroupedBy {
+  HOUR
+  DAY
+  WEEK
+  MONTH
+}
+
+# -- Output types ----------------------------------------------------------
+
+type DayMap {
+  monday: Boolean
+  tuesday: Boolean
+  wednesday: Boolean
+  thursday: Boolean
+  friday: Boolean
+  saturday: Boolean
+  sunday: Boolean
+}
+
+type ScheduleSlot {
+  startHour: Int
+  startMinute: Int
+  endHour: Int
+  endMinute: Int
+  enabled: Boolean
+  dayMap: DayMap
+}
+
+type ChargeStatus {
+  start: String
+  chargeEnergyTotal: Float
+  solarEnergyTotal: Float
+  gridEnergyTotal: Float
+  chargePower: Float
+  chargePowerMax: Float
+  solarPower: Float
+  gridPower: Float
+  duration: Int
+}
+
+type LoraConfig {
+  cfg: String
+  epow: String
+  on: Boolean
+  rssi: Float
+  eui: String
+}
+
+type DeviceStatus {
+  id: ID
+  konnectSerial: String
+  online: Boolean
+  lastEvent: String
+  lastEventAge: String
+  evseState: String
+  evseResponseTime: String
+  evseChargeAmpCurrentLimit: Float
+  sysSchEnabled: Boolean
+  sysUserLock: Boolean
+  sysScheduleLock: Boolean
+  sysRssi: Int
+  sysSSID: String
+  sysLan: Boolean
+  sysTemperature: Float
+  sysFreeMemory: Int
+  sysRuntime: Int
+  sysFwVersion: String
+  sysHwVersion: String
+  evseFwVersion: String
+  evseHwVersion: String
+  sysBootup: String
+  sysOs: String
+  sysProductId: String
+  sysProductName: String
+  sysOtaUpdate: String
+  sysRcmUserCleared: Boolean
+  sysButton: String
+  sysFaultCode: String
+  sysVoltageA: Float
+  sysVoltageB: Float
+  sysVoltageC: Float
+  sysAmpA: Float
+  sysAmpB: Float
+  sysAmpC: Float
+  sysPowerA: Float
+  sysPowerB: Float
+  sysPowerC: Float
+  sysPhase: Int
+  sysSolarCT: Float
+  sysGridCT: Float
+  sysAdaptiveFuse: String
+  sysTime: String
+  sysSch0: String
+  sysSch1: String
+  sysSch2: String
+  sysSch3: String
+  sysSch4: String
+  cfgPENEarthConnected: Boolean
+  cfgDebugEnable: Boolean
+  cfgChargeAmpMax: Float
+  cfgChargeAmpMin: Float
+  cfgDSTActive: Boolean
+  sysChargingEnabled: Boolean
+  sysSchSet: String
+  sysSolarPower: Float
+  sysGridPower: Float
+  sysChargePower: Float
+  sysSolarEnergyDelta: Float
+  sysGridEnergyDelta: Float
+  solarMaxGridChargePercent: Int
+  solarChargeAlways: Boolean
+  solarOverride: Boolean
+  cfgAFEnable: Boolean
+  cfgAFAmpMax: Float
+  cfgCTConfig: String
+  chargeStatus: ChargeStatus
+  scheduleSlotsArray: [ScheduleSlot]
+  sysSchDSORandom: String
+  cfgLora0: LoraConfig
+  cfgLora1: LoraConfig
+  cfgLora2: LoraConfig
+  cfgLora3: LoraConfig
+}
+
+type DeviceInfo {
+  id: ID
+  currency: String
+  enableThreePhaseMultiplier: Boolean
+  friendlyName: String
+  locationLongitude: Float
+  locationLatitude: Float
+  schedule0Name: String
+  schedule1Name: String
+  schedule2Name: String
+  schedule3Name: String
+  schedule4Name: String
+  address: String
+  addressPlace: String
+  addressDistrict: String
+  addressPostcode: String
+  addressCountry: String
+  solarOverrideStart: String
+  notifyRcmErrorEnabled: Boolean
+  notifyWeeklyReportEnabled: Boolean
+  notifyDeviceOfflineEnabled: Boolean
+  purpose: String
+  solarChargeAlways: Boolean
+  timeZoneRegion: String
+  userLock: Boolean
+  loraDevices: String
+}
+
+type ChargeRate {
+  id: ID
+  price: Float
+  timeStartLocal: String
+  timeStopLocal: String
+  startDateTime: Date
+  stopDateTime: Date
+}
+
+type ChargeLog {
+  chargeCostTotal: Float
+  chargeEnergyTotal: Float
+  deviceId: String
+  duration: Int
+  gridCostTotal: Float
+  gridEnergyTotal: Float
+  particleFwVersion: String
+  solarEnergyTotal: Float
+  solarCostTotal: Float
+  startDateTimeLocal: String
+  surplusUsedCostTotal: Float
+  surplusUsedEnergyTotal: Float
+  uuid: String
+}
+
+type Device {
+  id: ID
+  name: String
+  last_ip_address: String
+  last_app: String
+  connected: Boolean
+  return_value: String
+  deviceStatus: DeviceStatus
+  deviceInfo: DeviceInfo
+  deviceChargeRates: [ChargeRate]
+  deviceCalculatedChargeLogs(
+    limit: Int
+    offset: Int
+    minEnergy: Float
+    dateFrom: Date
+  ): [ChargeLog]
+  deviceCalculatedPowerLogsBinned(
+    dateFrom: Date
+    dateTo: Date
+    binnedMinutes: Int
+    groupBy: LogsGroupedBy
+    limit: Int
+    offset: Int
+  ): String
+}
+
+type Address {
+  summaryline: String
+  subbuildingname: String
+  buildingname: String
+  number: String
+  premise: String
+  street: String
+  posttown: String
+  county: String
+  postcode: String
+}
+
+type SolarSettings {
+  deviceId: ID
+  override: Boolean
+  chargeAlways: Boolean
+  maxGridChargePercent: Int
+  chargeOutsideSchedules: Boolean
+  return_value: Int
+}
+
+type CommandResult {
+  id: ID
+  name: String
+  last_app: String
+  connected: Boolean
+  return_value: Int
+}
+
+type CreateChargeRateResult {
+  id: ID
+}
+
+# -- Input types -----------------------------------------------------------
+
+input DayMapInput {
+  monday: Boolean
+  tuesday: Boolean
+  wednesday: Boolean
+  thursday: Boolean
+  friday: Boolean
+  saturday: Boolean
+  sunday: Boolean
+}
+
+input ScheduleSlotInput {
+  startHour: Int
+  startMinute: Int
+  endHour: Int
+  endMinute: Int
+  enabled: Boolean
+  dayMap: DayMapInput
+}
+
+input ScheduleSlotsInput {
+  schedules: [ScheduleSlotInput]
+}
+
+# -- Root types ------------------------------------------------------------
+
+type Query {
+  getSupportMessage: String
+  getCurrentUserDevices: [Device]
+  getDevice(id: ID!): Device
+  getSolar(deviceId: ID!): SolarSettings
+  searchAddress(addressFragment: String!, countryCode: String): [Address]
+}
+
+type Mutation {
+  setSolar(
+    deviceId: ID!
+    override: Boolean
+    chargeAlways: Boolean
+    maxGridChargePercent: Int
+    chargeOutsideSchedules: Boolean
+  ): SolarSettings
+
+  runAEVCommand(
+    deviceId: ID!
+    functionName: String!
+    params: String
+  ): CommandResult
+
+  setAllSchedulesDisabled(deviceId: ID!): CommandResult
+
+  setSchedules(
+    deviceId: ID!
+    scheduleSlots: ScheduleSlotsInput!
+  ): CommandResult
+
+  updateChargeRate(
+    id: ID!
+    startDateTime: Date
+    stopDateTime: Date
+    dayMon: Boolean
+    dayTue: Boolean
+    dayWed: Boolean
+    dayThu: Boolean
+    dayFri: Boolean
+    daySat: Boolean
+    daySun: Boolean
+    timeStartLocal: String
+    timeStopLocal: String
+    price: Float!
+  ): Boolean
+
+  createChargeRate(
+    deviceId: ID!
+    startDateTime: Date
+    stopDateTime: Date
+    dayMon: Boolean
+    dayTue: Boolean
+    dayWed: Boolean
+    dayThu: Boolean
+    dayFri: Boolean
+    daySat: Boolean
+    daySun: Boolean
+    timeStartLocal: String
+    timeStopLocal: String
+    price: Float!
+  ): CreateChargeRateResult
+
+  deleteChargeRate(id: ID!): Boolean
+
+  upsertDeviceInfo(
+    deviceId: ID!
+    friendlyName: String
+    schedule0Name: String
+    schedule1Name: String
+    schedule2Name: String
+    schedule3Name: String
+    schedule4Name: String
+  ): DeviceInfo
+
+  upsertAccount(firstName: String, lastName: String): Boolean
+
+  unclaimDevice(deviceId: ID!): Boolean
+
+  claimDeviceByName(deviceName: String!): Device
+
+  registerMobileDevice(token: String!): Boolean
+
+  unregisterMobileDevice(token: String!): Boolean
+}
+
+type Subscription {
+  deviceStatusUpdated(id: ID!): DeviceStatus
+}

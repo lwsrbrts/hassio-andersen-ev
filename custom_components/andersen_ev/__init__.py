@@ -153,6 +153,15 @@ class AndersenEvCoordinator(DataUpdateCoordinator):
         self.client = client
         self.devices = []
 
+    async def async_request_refresh(self) -> None:
+        """Request a data refresh after a short delay.
+
+        The Andersen API needs a moment to apply changes before the
+        updated state is available, so we wait briefly before fetching.
+        """
+        await asyncio.sleep(1.5)
+        await super().async_request_refresh()
+
     async def _async_update_data(self):
         """Fetch data from API endpoint."""
         try:

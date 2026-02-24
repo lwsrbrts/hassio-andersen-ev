@@ -133,3 +133,94 @@ class TestDeviceGraphQLCalls:
 
         # Verify execute_query was called
         mock_device.graphql_client.execute_query.assert_called_once()
+
+    # -- solar tests -------------------------------------------------------
+
+    @pytest.mark.asyncio
+    async def test_get_solar_success(self, mock_device):
+        """Test get_solar re-fetches status and extracts solar fields."""
+        mock_device.graphql_client.execute_query = AsyncMock(
+            return_value={
+                "getDevice": {
+                    "deviceStatus": {
+                        "solarOverride": False,
+                        "solarChargeAlways": True,
+                        "solarMaxGridChargePercent": 50,
+                        "online": True,
+                    }
+                }
+            }
+        )
+
+        solar = await mock_device.get_solar()
+
+        assert solar is not None
+        assert solar["solarOverride"] is False
+        assert solar["solarChargeAlways"] is True
+        assert solar["solarMaxGridChargePercent"] == 50
+        mock_device.graphql_client.execute_query.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_get_solar_no_status(self, mock_device):
+        """Test get_solar returns None when status fetch fails."""
+        mock_device.graphql_client.execute_query = AsyncMock(return_value=None)
+
+        solar = await mock_device.get_solar()
+        assert solar is None
+
+    @pytest.mark.asyncio
+    async def test_get_solar_missing_fields(self, mock_device):
+        """Test get_solar returns None values for missing solar fields."""
+        mock_device.graphql_client.execute_query = AsyncMock(
+            return_value={"getDevice": {"deviceStatus": {"online": True}}}
+        )
+
+        solar = await mock_device.get_solar()
+        assert solar is not None
+        assert solar["solarOverride"] is None
+        assert solar["solarChargeAlways"] is None
+        assert solar["solarMaxGridChargePercent"] is None
+
+    @pytest.mark.asyncio
+    async def test_set_solar_all_params(self, mock_device, graphql_set_solar_response):
+        """Test set_solar with all optional parameters."""
+        mock_device.graphql_client.set_solar = AsyncMock(return_value=True)
+
+        result = await mock_device.set_solar(
+            override=True,
+            charge_always=False,
+            max_grid_charge_percent=75,
+            charge_outside_schedules=True,
+        )
+
+        assert result is True
+        mock_device.graphql_client.set_solar.assert_called_once_with(
+            "test_device_123",
+            {
+                "override": True,
+                "chargeAlways": False,
+                "maxGridChargePercent": 75,
+                "chargeOutsideSchedules": True,
+            },
+        )
+
+    @pytest.mark.asyncio
+    async def test_set_solar_single_param(self, mock_device, graphql_set_solar_response):
+        """Test set_solar with only one optional parameter."""
+        mock_device.graphql_client.set_solar = AsyncMock(return_value=True)
+
+        result = await mock_device.set_solar(override=True)
+
+        assert result is True
+        mock_device.graphql_client.set_solar.assert_called_once_with(
+            "test_device_123",
+            {"override": True},
+        )
+
+    @pytest.mark.asyncio
+    async def test_set_solar_failure(self, mock_device):
+        """Test set_solar when API returns None."""
+        mock_device.graphql_client.set_solar = AsyncMock(return_value=False)
+
+        result = await mock_device.set_solar(override=True)
+        assert result is False

@@ -150,3 +150,28 @@ def graphql_error_response():
             }
         ]
     }
+
+
+@pytest.fixture
+def graphql_get_solar_response():
+    """Sample GraphQL response for getSolar query."""
+    return {
+        "getSolar": {
+            "deviceId": "test_device_123",
+            "override": False,
+            "chargeAlways": True,
+            "maxGridChargePercent": 50,
+            "chargeOutsideSchedules": True,
+            "return_value": True,
+        }
+    }
+
+
+@pytest.fixture
+def graphql_set_solar_response():
+    """Sample GraphQL response for setSolar mutation."""
+    return {
+        "setSolar": {
+            "return_value": True,
+        }
+    }

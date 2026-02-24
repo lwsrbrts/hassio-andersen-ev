@@ -4,15 +4,18 @@ import asyncio
 import logging
 import time
 from collections.abc import Awaitable, Callable
+from functools import lru_cache
+from pathlib import Path
 from typing import Any
 
 from gql import Client, gql
+from gql.dsl import DSLMutation, DSLSchema, dsl_gql
 from gql.transport.aiohttp import AIOHTTPTransport
 from gql.transport.exceptions import (
     TransportQueryError,
     TransportServerError,
 )
-from graphql import DocumentNode
+from graphql import DocumentNode, build_schema
 
 from . import const
 
@@ -39,6 +42,18 @@ class _GqlTransportFilter(logging.Filter):  # pylint: disable=too-few-public-met
 
 
 _gql_transport_logger.addFilter(_GqlTransportFilter())
+
+_SCHEMA_FILE = Path(__file__).resolve().parent.parent / "schema.graphql"
+
+
+@lru_cache(maxsize=1)
+def get_dsl_schema() -> DSLSchema:
+    """Load the Andersen EV GraphQL schema and return a DSLSchema instance.
+
+    The result is cached so the schema file is only read and parsed once.
+    """
+    schema = build_schema(_SCHEMA_FILE.read_text())
+    return DSLSchema(schema)
 
 
 class GraphQLClient:
@@ -141,44 +156,53 @@ class GraphQLClient:
         """Parse a GraphQL query string into a DocumentNode."""
         return gql(query)
 
-    async def execute_query(
+    async def execute_document(
         self,
-        operation_name: str,
-        query: str,
-        variables: dict[str, Any] | None = None,
+        document: DocumentNode,
+        *,
+        variable_values: dict[str, Any] | None = None,
+        operation_name: str = "",
     ) -> dict[str, Any] | None:
-        """Execute a GraphQL query.
+        """Execute a pre-built GraphQL DocumentNode.
 
-        Handles 401 auth failures by refreshing the token and retrying once.
+        This is the core execution method. It handles 401 auth failures by
+        refreshing the token and retrying once.
+
+        Args:
+            document: A parsed GraphQL DocumentNode (from gql() or dsl_gql()).
+            variable_values: Optional variable values for parameterised queries.
+            operation_name: Name of the operation in the document.  Sent to
+                the server and used in log messages.  Leave empty for
+                anonymous DSL-built documents.
 
         Returns:
             The ``data`` portion of the response, or *None* on error.
         """
-        document = self._parse_document(query)
+        label = operation_name or "GraphQL operation"
+        wire_op_name = operation_name or None
 
         try:
             await self._ensure_connected()
             return await self._session.execute(
                 document,
-                variable_values=variables,
-                operation_name=operation_name,
+                variable_values=variable_values,
+                operation_name=wire_op_name,
             )
         except TransportServerError as err:
             if err.code != 401:
-                _LOGGER.warning("Failed %s, HTTP status code: %s", operation_name, err.code)
+                _LOGGER.warning("Failed %s, HTTP status code: %s", label, err.code)
                 return None
 
-            # 401: refresh token and retry once
             _LOGGER.debug(
                 "Token expired during %s, refreshing and retrying",
-                operation_name,
+                label,
             )
             try:
                 await self._refresh_and_reconnect()
                 return await self._session.execute(
                     document,
-                    variable_values=variables,
-                    operation_name=operation_name,
+                    variable_values=variable_values,
+                    operation_name=wire_op_name,
                 )
             except (
                 TransportServerError,
@@ -187,16 +211,30 @@ class GraphQLClient:
             ) as retry_err:
                 _LOGGER.error(
                     "Retry after token refresh failed for %s: %s",
-                    operation_name,
+                    label,
                     retry_err,
                 )
                 return None
         except TransportQueryError as err:
-            _LOGGER.warning("GraphQL errors in %s: %s", operation_name, err.errors)
+            _LOGGER.warning("GraphQL errors in %s: %s", label, err.errors)
             return None
         except OSError as err:
-            _LOGGER.error("Error executing GraphQL query %s: %s", operation_name, err)
+            _LOGGER.error("Error executing GraphQL %s: %s", label, err)
             return None
+
+    async def execute_query(
+        self,
+        operation_name: str,
+        query: str,
+        variables: dict[str, Any] | None = None,
+    ) -> dict[str, Any] | None:
+        """Execute a GraphQL query from a string."""
+        document = self._parse_document(query)
+        return await self.execute_document(
+            document,
+            variable_values=variables,
+            operation_name=operation_name,
+        )
 
     async def execute_mutation(
         self,
@@ -204,8 +242,43 @@ class GraphQLClient:
         mutation: str,
         variables: dict[str, Any] | None = None,
     ) -> dict[str, Any] | None:
-        """Execute a GraphQL mutation (delegates to execute_query)."""
+        """Execute a GraphQL mutation from a string."""
         return await self.execute_query(operation_name, mutation, variables)
+
+    # -- solar operations --------------------------------------------------
+
+    async def set_solar(
+        self,
+        device_id: str,
+        fields: dict[str, Any],
+    ) -> bool:
+        """Update solar charging settings for a device.
+
+        *fields* is a mapping of API argument names (``override``,
+        ``chargeAlways``, ``maxGridChargePercent``,
+        ``chargeOutsideSchedules``) to their desired values.  Only the
+        keys present in *fields* are sent to the API.
+
+        Returns *True* on success, *False* on error.
+        """
+        args: dict[str, Any] = {"deviceId": device_id, **fields}
+
+        ds = get_dsl_schema()
+        document = dsl_gql(
+            DSLMutation(
+                ds.Mutation.setSolar.args(**args).select(
+                    ds.SolarSettings.return_value,
+                )
+            )
+        )
+
+        result = await self.execute_document(document)
+
+        if result is None:
+            return False
+
+        _LOGGER.debug("setSolar response: %s", result)
+        return True
 
     # -- token refresh -----------------------------------------------------
 

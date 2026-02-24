@@ -329,6 +329,7 @@ query getSolar(
     override
     chargeAlways
     maxGridChargePercent
+    chargeOutsideSchedules
     return_value
   }
 }
@@ -338,12 +339,14 @@ mutation setSolar(
   $override: Boolean
   $chargeAlways: Boolean
   $maxGridChargePercent: Int
+  $chargeOutsideSchedules: Boolean
 ) {
   setSolar(
     deviceId: $deviceId
     override: $override
     chargeAlways: $chargeAlways
     maxGridChargePercent: $maxGridChargePercent
+    chargeOutsideSchedules: $chargeOutsideSchedules
   ) {
     return_value
   }
@@ -489,7 +492,7 @@ query getDeviceStatus($id: ID!) {
           sunday
         }
       }
-      sysSchDSORandom      
+      sysSchDSORandom
     }
   }
 }

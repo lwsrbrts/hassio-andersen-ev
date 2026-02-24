@@ -224,6 +224,63 @@ class KonnectDevice:
             "surplusUsedEnergyTotal": latest_log["surplusUsedEnergyTotal"],
         }
 
+    async def get_solar(self) -> dict | None:
+        """Get the current solar charging settings from the device.
+
+        The API's ``getSolar`` query is non-functional, so instead we
+        re-fetch the full device status and extract the solar fields.
+        """
+        status = await self.get_detailed_device_status()
+        if not status:
+            _LOGGER.debug(
+                "Could not fetch status for device %s (%s), cannot read solar settings",
+                self.device_id,
+                self.friendly_name,
+            )
+            return None
+
+        return {
+            "solarOverride": status.get("solarOverride"),
+            "solarChargeAlways": status.get("solarChargeAlways"),
+            "solarMaxGridChargePercent": status.get("solarMaxGridChargePercent"),
+        }
+
+    async def set_solar(
+        self,
+        *,
+        override: bool | None = None,
+        charge_always: bool | None = None,
+        max_grid_charge_percent: int | None = None,
+        charge_outside_schedules: bool | None = None,
+    ) -> bool:
+        """Update solar charging settings on the device.
+
+        Only the provided (non-None) parameters are sent to the API.
+        """
+        _LOGGER.debug(
+            "Setting solar options for device %s (%s): "
+            "override=%s, charge_always=%s, max_grid_charge_percent=%s, "
+            "charge_outside_schedules=%s",
+            self.device_id,
+            self.friendly_name,
+            override,
+            charge_always,
+            max_grid_charge_percent,
+            charge_outside_schedules,
+        )
+
+        fields: dict[str, object] = {}
+        if override is not None:
+            fields["override"] = override
+        if charge_always is not None:
+            fields["chargeAlways"] = charge_always
+        if max_grid_charge_percent is not None:
+            fields["maxGridChargePercent"] = max_grid_charge_percent
+        if charge_outside_schedules is not None:
+            fields["chargeOutsideSchedules"] = charge_outside_schedules
+
+        return await self.graphql_client.set_solar(self.device_id, fields)
+
     async def get_device_info(self):
         """Get the detailed device information."""
         _LOGGER.debug("Fetching detailed info for device %s (%s)", self.device_id, self.friendly_name)

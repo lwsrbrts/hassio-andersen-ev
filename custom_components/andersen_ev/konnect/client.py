@@ -41,7 +41,9 @@ class KonnectClient:
         try:
             # Run the AWS SRP authentication in an executor
             # to avoid blocking the event loop
-            aws_response = await asyncio.get_event_loop().run_in_executor(None, self.__authenticate_with_aws_srp)
+            aws_response = await asyncio.get_event_loop().run_in_executor(
+                None, self.__authenticate_with_aws_srp
+            )
 
             aws_result = aws_response["AuthenticationResult"]
             self.token = aws_result["IdToken"]
@@ -51,7 +53,10 @@ class KonnectClient:
             self.tokenExpiryTime = time.time() + aws_result["ExpiresIn"] - 90
             self.refreshToken = aws_result["RefreshToken"]
 
-            _LOGGER.debug("Authentication successful, token will expire in %s seconds", aws_result["ExpiresIn"])
+            _LOGGER.debug(
+                "Authentication successful, token will expire in %s seconds",
+                aws_result["ExpiresIn"],
+            )
 
         except Exception as e:
             _LOGGER.error("Authentication failed: %s", str(e))
@@ -103,7 +108,11 @@ class KonnectClient:
                 await self.refresh_token()
                 return await self.getDevices()
 
-            _LOGGER.error("Failed to get devices. Status Code: %s, Response: %s", response.status_code, response.text)
+            _LOGGER.error(
+                "Failed to get devices. Status Code: %s, Response: %s",
+                response.status_code,
+                response.text,
+            )
             return devices
 
         response_body = response.json()
@@ -123,7 +132,7 @@ class KonnectClient:
                     api=self,
                     device_id=device["id"],
                     friendly_name=friendly_name,
-                    user_lock=device["userLock"],
+                    user_lock=device.get("userLock", False),
                 )
             )
 
@@ -157,5 +166,7 @@ class KonnectClient:
         else:
             _LOGGER.debug(
                 "Token still valid, expiry in %s seconds",
-                int(self.tokenExpiryTime - time.time()) if self.tokenExpiryTime else "unknown",
+                int(self.tokenExpiryTime - time.time())
+                if self.tokenExpiryTime
+                else "unknown",
             )

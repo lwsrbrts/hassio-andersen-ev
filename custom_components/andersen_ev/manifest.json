@@ -1,13 +1,13 @@
 {
   "domain": "andersen_ev",
   "name": "Andersen EV",
-  "documentation": "https://github.com/lwsrbrts/hassio-andersen-ev",
-  "issue_tracker": "https://github.com/lwsrbrts/hassio-andersen-ev/issues",
+  "documentation": "https://github.com/HA-AndersenEV/hassio-andersen-ev",
+  "issue_tracker": "https://github.com/HA-AndersenEV/hassio-andersen-ev/issues",
   "dependencies": [],
-  "codeowners": ["@lwsrbrts"],
+  "codeowners": ["@lwsrbrts", "@toby200"],
   "requirements": ["pycognito", "gql[aiohttp]"],
   "config_flow": true,
   "iot_class": "cloud_polling",
-  "version": "0.6.4",
+  "version": "0.7.1",
   "icon": "mdi:ev-station"
 }

@@ -123,7 +123,7 @@ class KonnectClient:
                 api = self,
                 device_id = device['id'],
                 friendly_name = friendly_name,
-                user_lock = device['userLock']))
+                user_lock=device.get("userLock", False),
 
         return devices
 

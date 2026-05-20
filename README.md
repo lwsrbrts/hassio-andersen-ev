@@ -7,7 +7,7 @@
 [![GitHub Release](https://img.shields.io/github/v/release/HA-AndersenEV/hassio-andersen-ev)](https://github.com/HA-AndersenEV/hassio-andersen-ev/releases)
 [![Integration Usage](https://img.shields.io/badge/dynamic/json?color=41BDF5&logo=home-assistant&label=integration%20usage&suffix=%20installs&cacheSeconds=15600&url=https://analytics.home-assistant.io/custom_integrations.json&query=$.andersen_ev.total)
 
-### Beta 0.6.5
+### Beta 0.6.5.1
 
 ## Features
 * Switch entities for each charging schedule allows enabling/disabling charge schedules.
@@ -78,6 +78,9 @@ data:
 Frankly depends on whether or not I sell my house (with the charger).
 
 ## Changelog
+### 0.6.5.1
+* Fix breaking bug in 0.6.5
+
 ### 0.6.5
 * Resolve userLock bug when andersen don't send userLock info explicitly
 

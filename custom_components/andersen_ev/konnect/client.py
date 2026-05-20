@@ -119,11 +119,14 @@ class KonnectClient:
         for device in response_body['devices']:
             # Use "Andersen" as default friendly name if not set or empty
             friendly_name = device.get('friendlyName') or "Andersen"
-            devices.append(KonnectDevice(
-                api = self,
-                device_id = device['id'],
-                friendly_name = friendly_name,
-                user_lock=device.get("userLock", False),
+            devices.append(
+                KonnectDevice(
+                    api = self,
+                    device_id = device['id'],
+                    friendly_name = friendly_name,
+                    user_lock=device.get("userLock", False)
+                )
+            )
 
         return devices
 

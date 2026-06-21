@@ -268,12 +268,7 @@ class GraphQLClient:
     def _has_unauthenticated_error(err: TransportQueryError) -> bool:
         """Return True if any error in the response has code UNAUTHENTICATED."""
         return any(
-            (
-                error.get("extensions", {})
-                if isinstance(error, dict)
-                else getattr(error, "extensions", {}) or {}
-            ).get("code")
-            == "UNAUTHENTICATED"
+            (error.get("extensions", {}) if isinstance(error, dict) else {}).get("code") == "UNAUTHENTICATED"
             for error in (err.errors or [])
         )
 
@@ -331,9 +326,7 @@ class GraphQLClient:
     def _create_refresh_task(self) -> None:
         """Create a task for proactive token refresh, storing the reference."""
         self._refresh_task = asyncio.create_task(self._proactive_refresh())
-        self._refresh_task.add_done_callback(
-            lambda _: setattr(self, "_refresh_task", None)
-        )
+        self._refresh_task.add_done_callback(lambda _: setattr(self, "_refresh_task", None))
 
     async def _proactive_refresh(self) -> None:
         """Proactive refresh triggered by the scheduled timer."""

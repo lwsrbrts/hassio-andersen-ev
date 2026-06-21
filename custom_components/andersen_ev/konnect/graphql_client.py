@@ -195,21 +195,10 @@ class GraphQLClient:
             _LOGGER.debug("Token expired during %s, refreshing and retrying", label)
             return await self._refresh_and_retry(document, variable_values, wire_op_name, label)
         except TransportQueryError as err:
-            unauthenticated = any(
-                (
-                    (
-                        error.get("extensions", {})
-                        if isinstance(error, dict)
-                        else getattr(error, "extensions", {}) or {}
-                    ).get("code")
-                    == "UNAUTHENTICATED"
-                )
-                for error in (err.errors or [])
-            )
-            if not unauthenticated:
+            if not self._has_unauthenticated_error(err):
                 _LOGGER.warning("GraphQL errors in %s: %s", label, err.errors)
                 return None
-            _LOGGER.info(
+            _LOGGER.debug(
                 "Authentication error during %s, refreshing and retrying", label
             )
             return await self._refresh_and_retry(document, variable_values, wire_op_name, label)
@@ -274,6 +263,19 @@ class GraphQLClient:
 
         _LOGGER.debug("setSolar response: %s", result)
         return True
+
+    @staticmethod
+    def _has_unauthenticated_error(err: TransportQueryError) -> bool:
+        """Return True if any error in the response has code UNAUTHENTICATED."""
+        return any(
+            (
+                error.get("extensions", {})
+                if isinstance(error, dict)
+                else getattr(error, "extensions", {}) or {}
+            ).get("code")
+            == "UNAUTHENTICATED"
+            for error in (err.errors or [])
+        )
 
     async def _refresh_and_retry(
         self,

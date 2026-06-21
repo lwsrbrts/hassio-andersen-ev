@@ -197,13 +197,18 @@ class GraphQLClient:
                 document, variable_values, wire_op_name, label
             )
         except TransportQueryError as err:
-            if not (
-                err.errors
-                and any(
-                    error.get("extensions", {}).get("code") == "UNAUTHENTICATED"
-                    for error in err.errors
+            unauthenticated = any(
+                (
+                    (
+                        error.get("extensions", {})
+                        if isinstance(error, dict)
+                        else getattr(error, "extensions", {}) or {}
+                    ).get("code")
+                    == "UNAUTHENTICATED"
                 )
-            ):
+                for error in (err.errors or [])
+            )
+            if not unauthenticated:
                 _LOGGER.warning("GraphQL errors in %s: %s", label, err.errors)
                 return None
             _LOGGER.info(

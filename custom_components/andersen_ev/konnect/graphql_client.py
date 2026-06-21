@@ -192,32 +192,27 @@ class GraphQLClient:
             if err.code != 401:
                 _LOGGER.warning("Failed %s, HTTP status code: %s", label, err.code)
                 return None
-
-            _LOGGER.debug(
-                "Token expired during %s, refreshing and retrying",
-                label,
-            )
-            try:
-                await self._refresh_and_reconnect()
-                return await self._session.execute(
-                    document,
-                    variable_values=variable_values,
-                    operation_name=wire_op_name,
-                )
-            except (
-                TransportServerError,
-                TransportQueryError,
-                OSError,
-            ) as retry_err:
-                _LOGGER.error(
-                    "Retry after token refresh failed for %s: %s",
-                    label,
-                    retry_err,
-                )
-                return None
+            _LOGGER.debug("Token expired during %s, refreshing and retrying", label)
+            return await self._refresh_and_retry(document, variable_values, wire_op_name, label)
         except TransportQueryError as err:
-            _LOGGER.warning("GraphQL errors in %s: %s", label, err.errors)
-            return None
+            unauthenticated = any(
+                (
+                    (
+                        error.get("extensions", {})
+                        if isinstance(error, dict)
+                        else getattr(error, "extensions", {}) or {}
+                    ).get("code")
+                    == "UNAUTHENTICATED"
+                )
+                for error in (err.errors or [])
+            )
+            if not unauthenticated:
+                _LOGGER.warning("GraphQL errors in %s: %s", label, err.errors)
+                return None
+            _LOGGER.info(
+                "Authentication error during %s, refreshing and retrying", label
+            )
+            return await self._refresh_and_retry(document, variable_values, wire_op_name, label)
         except OSError as err:
             _LOGGER.error("Error executing GraphQL %s: %s", label, err)
             return None
@@ -280,6 +275,29 @@ class GraphQLClient:
         _LOGGER.debug("setSolar response: %s", result)
         return True
 
+    async def _refresh_and_retry(
+        self,
+        document: DocumentNode,
+        variable_values: dict[str, Any] | None,
+        wire_op_name: str | None,
+        label: str,
+    ) -> dict[str, Any] | None:
+        """Refresh the token and retry the operation once."""
+        try:
+            await self._refresh_and_reconnect()
+            return await self._session.execute(
+                document,
+                variable_values=variable_values,
+                operation_name=wire_op_name,
+            )
+        except (TransportServerError, TransportQueryError, OSError) as retry_err:
+            _LOGGER.error(
+                "Retry after token refresh failed for %s: %s",
+                label,
+                retry_err,
+            )
+            return None
+
     # -- token refresh -----------------------------------------------------
 
     async def _refresh_and_reconnect(self) -> None:
@@ -311,7 +329,9 @@ class GraphQLClient:
     def _create_refresh_task(self) -> None:
         """Create a task for proactive token refresh, storing the reference."""
         self._refresh_task = asyncio.create_task(self._proactive_refresh())
-        self._refresh_task.add_done_callback(lambda _: setattr(self, "_refresh_task", None))
+        self._refresh_task.add_done_callback(
+            lambda _: setattr(self, "_refresh_task", None)
+        )
 
     async def _proactive_refresh(self) -> None:
         """Proactive refresh triggered by the scheduled timer."""

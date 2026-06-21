@@ -267,10 +267,12 @@ class GraphQLClient:
     @staticmethod
     def _has_unauthenticated_error(err: TransportQueryError) -> bool:
         """Return True if any error in the response has code UNAUTHENTICATED."""
-        return any(
-            (error.get("extensions", {}) if isinstance(error, dict) else {}).get("code") == "UNAUTHENTICATED"
-            for error in (err.errors or [])
-        )
+        for error in err.errors or []:
+            if not isinstance(error, dict):
+                continue
+            if error.get("extensions", {}).get("code") == "UNAUTHENTICATED":
+                return True
+        return False
 
     async def _refresh_and_retry(
         self,

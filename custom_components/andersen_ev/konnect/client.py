@@ -57,7 +57,7 @@ class KonnectClient:
             self.token = aws_result["IdToken"]
             self.tokenType = aws_result["TokenType"]
             self.tokenExpiresIn = aws_result["ExpiresIn"]
-            # Calculate absolute expiry time (subtract 5 minutes for safety margin)
+            # Calculate absolute expiry time (subtract 90 seconds for safety margin)
             self.tokenExpiryTime = time.time() + aws_result["ExpiresIn"] - 90
             self.refreshToken = aws_result["RefreshToken"]
             self.deviceKey = device_key
@@ -100,6 +100,7 @@ class KonnectClient:
         if ndm:
             device_key = ndm.get("DeviceKey")
             try:
+                aws_srp.confirm_device(tokens)
                 _LOGGER.debug(
                     "Device confirmed with Cognito (device tracking active), key ...%s",
                     device_key[-4:] if device_key and len(device_key) >= 4 else device_key,

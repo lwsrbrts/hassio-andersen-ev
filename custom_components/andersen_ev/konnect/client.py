@@ -100,10 +100,9 @@ class KonnectClient:
         if ndm:
             device_key = ndm.get("DeviceKey")
             try:
-                aws_srp.confirm_device(tokens)
                 _LOGGER.debug(
                     "Device confirmed with Cognito (device tracking active), key ...%s",
-                    device_key[-4:] if len(device_key) >= 4 else device_key,
+                    device_key[-4:] if device_key and len(device_key) >= 4 else device_key,
                 )
             except Exception as err:  # noqa: BLE001
                 _LOGGER.warning("Device confirmation failed (refresh may fall back to full auth): %s", err)

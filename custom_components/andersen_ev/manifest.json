@@ -5,7 +5,7 @@
   "issue_tracker": "https://github.com/HA-AndersenEV/hassio-andersen-ev/issues",
   "dependencies": [],
   "codeowners": ["@lwsrbrts", "@toby200"],
-  "requirements": ["pycognito", "gql[aiohttp]"],
+  "requirements": ["pycognito", "gql[aiohttp]", "boto3"],
   "config_flow": true,
   "iot_class": "cloud_polling",
   "version": "0.7.1",

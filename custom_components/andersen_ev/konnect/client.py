@@ -2,11 +2,17 @@ import asyncio
 import logging
 import time
 
+import boto3
 import requests
+from botocore.exceptions import ClientError
 from pycognito.aws_srp import AWSSRP
 
 from . import const
 from .device import KonnectDevice
+
+POOL_ID = "eu-west-1_t5HV3bFjl"
+POOL_REGION = "eu-west-1"
+CLIENT_ID = "23s0olnnniu5472ons0d9uoqt9"
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -21,6 +27,7 @@ class KonnectClient:
     tokenExpiresIn = None
     tokenExpiryTime = None  # New field to track token expiration time
     refreshToken = None
+    deviceKey = None
 
     def __init__(self, email, password):
         self.email = email
@@ -30,6 +37,7 @@ class KonnectClient:
         self.tokenExpiresIn = None
         self.tokenExpiryTime = None
         self.refreshToken = None  # Keeping property for compatibility with storage
+        self.deviceKey = None
 
     async def authenticate_user(self):
         """Authenticate with AWS Cognito using SRP."""
@@ -41,7 +49,7 @@ class KonnectClient:
         try:
             # Run the AWS SRP authentication in an executor
             # to avoid blocking the event loop
-            aws_response = await asyncio.get_event_loop().run_in_executor(
+            aws_response, device_key = await asyncio.get_event_loop().run_in_executor(
                 None, self.__authenticate_with_aws_srp
             )
 
@@ -52,11 +60,25 @@ class KonnectClient:
             # Calculate absolute expiry time (subtract 5 minutes for safety margin)
             self.tokenExpiryTime = time.time() + aws_result["ExpiresIn"] - 90
             self.refreshToken = aws_result["RefreshToken"]
+            self.deviceKey = device_key
 
-            _LOGGER.debug(
-                "Authentication successful, token will expire in %s seconds",
-                aws_result["ExpiresIn"],
-            )
+            if device_key:
+                _LOGGER.debug(
+                    "Authentication successful, device key captured (...%s); "
+                    "refresh will use REFRESH_TOKEN_AUTH; "
+                    "token expires in %s seconds (effective expiry %s)",
+                    device_key[-4:] if len(device_key) >= 4 else device_key,
+                    aws_result["ExpiresIn"],
+                    self._expiry_str(),
+                )
+            else:
+                _LOGGER.warning(
+                    "Authentication succeeded but NO device key was captured; "
+                    "token refresh will fall back to full SRP re-auth every cycle; "
+                    "token expires in %s seconds (effective expiry %s)",
+                    aws_result["ExpiresIn"],
+                    self._expiry_str(),
+                )
 
         except Exception as e:
             _LOGGER.error("Authentication failed: %s", str(e))
@@ -67,16 +89,76 @@ class KonnectClient:
         aws_srp = AWSSRP(
             username=self.username,
             password=self.password,
-            pool_id="eu-west-1_t5HV3bFjl",
-            pool_region="eu-west-1",
-            client_id="23s0olnnniu5472ons0d9uoqt9",
+            pool_id=POOL_ID,
+            pool_region=POOL_REGION,
+            client_id=CLIENT_ID,
         )
-        return aws_srp.authenticate_user()
+        tokens = aws_srp.authenticate_user()
+
+        device_key = None
+        ndm = tokens["AuthenticationResult"].get("NewDeviceMetadata")
+        if ndm:
+            device_key = ndm.get("DeviceKey")
+            try:
+                aws_srp.confirm_device(tokens)
+                _LOGGER.debug(
+                    "Device confirmed with Cognito (device tracking active), key ...%s",
+                    device_key[-4:] if len(device_key) >= 4 else device_key,
+                )
+            except Exception as err:  # noqa: BLE001
+                _LOGGER.warning("Device confirmation failed (refresh may fall back to full auth): %s", err)
+
+        return tokens, device_key
 
     async def refresh_token(self):
-        """Perform a full re-authentication instead of trying to use refresh tokens."""
-        _LOGGER.debug("Performing full re-authentication instead of token refresh")
-        await self.authenticate_user()
+        """Renew the id_token via REFRESH_TOKEN_AUTH (with DEVICE_KEY), falling
+        back to a full SRP login only if the refresh token is dead."""
+        if not self.refreshToken or not self.deviceKey:
+            _LOGGER.debug("No refresh token / device key; performing full authentication")
+            await self.authenticate_user()
+            return
+        _LOGGER.debug(
+            "Refreshing token via REFRESH_TOKEN_AUTH, device key ...%s",
+            self.deviceKey[-4:] if len(self.deviceKey) >= 4 else self.deviceKey,
+        )
+        try:
+            result = await asyncio.get_event_loop().run_in_executor(None, self.__refresh_with_device_key)
+        except ClientError as err:
+            code = err.response.get("Error", {}).get("Code")
+            if code == "NotAuthorizedException":
+                _LOGGER.info("Refresh token expired/revoked; performing full re-authentication")
+                await self.authenticate_user()
+                return
+            raise
+        self.token = result["IdToken"]
+        self.tokenType = result["TokenType"]
+        self.tokenExpiresIn = result["ExpiresIn"]
+        self.tokenExpiryTime = time.time() + result["ExpiresIn"] - 90
+        # REFRESH_TOKEN_AUTH does not rotate the refresh token; keep the stored one
+        # unless the response unexpectedly includes a new one.
+        if "RefreshToken" in result:
+            self.refreshToken = result["RefreshToken"]
+        _LOGGER.debug(
+            "Token refreshed via REFRESH_TOKEN_AUTH, expires in %s seconds (effective expiry %s)",
+            result["ExpiresIn"],
+            self._expiry_str(),
+        )
+
+    def __refresh_with_device_key(self):
+        """Blocking REFRESH_TOKEN_AUTH including the DEVICE_KEY the token is bound to."""
+        client = boto3.client("cognito-idp", region_name=POOL_REGION)
+        response = client.initiate_auth(
+            ClientId=CLIENT_ID,
+            AuthFlow="REFRESH_TOKEN_AUTH",
+            AuthParameters={"REFRESH_TOKEN": self.refreshToken, "DEVICE_KEY": self.deviceKey},
+        )
+        return response["AuthenticationResult"]
+
+    def _expiry_str(self):
+        """Local-time string for the effective token expiry (includes the 90s safety margin)."""
+        if not self.tokenExpiryTime:
+            return "unknown"
+        return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(self.tokenExpiryTime))
 
     async def is_token_valid(self):
         """Check if the current token is still valid."""
@@ -165,8 +247,7 @@ class KonnectClient:
             await self.refresh_token()
         else:
             _LOGGER.debug(
-                "Token still valid, expiry in %s seconds",
-                int(self.tokenExpiryTime - time.time())
-                if self.tokenExpiryTime
-                else "unknown",
+                "Token still valid, expiry in %s seconds (effective expiry %s)",
+                int(self.tokenExpiryTime - time.time()) if self.tokenExpiryTime else "unknown",
+                self._expiry_str(),
             )

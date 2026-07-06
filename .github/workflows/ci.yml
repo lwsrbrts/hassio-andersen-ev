@@ -66,6 +66,22 @@ jobs:
         with:
           category: integration
 
+  typecheck:
+    name: Typecheck
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.13"
+          enable-cache: true
+      - name: Install dependencies
+        run: uv pip install mypy -r requirements.txt
+      - name: Run mypy
+        run: uv run mypy custom_components/andersen_ev
+
   ci-success:
     name: CI Success
     # Stable required-status-check target: its name never changes when the

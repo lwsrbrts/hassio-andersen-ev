@@ -31,21 +31,22 @@ jobs:
         run: ruff format --check --config custom_components/andersen_ev/ruff.toml custom_components/andersen_ev
 
   test:
-    name: Test
+    name: Test (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.13", "3.14"]
     steps:
       - uses: actions/checkout@v4
-      - name: Set up Python 3.13
-        uses: actions/setup-python@v5
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
         with:
-          python-version: "3.13"
+          python-version: ${{ matrix.python-version }}
+          enable-cache: true
       - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install pytest pytest-asyncio
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+        run: uv pip install pytest pytest-asyncio pytest-cov -r requirements.txt
       - name: Test with pytest
-        run: pytest
+        run: uv run pytest --cov=custom_components/andersen_ev --cov-report=term-missing --cov-report=xml
 
   hassfest:
     name: Hassfest
@@ -64,3 +65,20 @@ jobs:
       - uses: hacs/action@main
         with:
           category: integration
+
+  ci-success:
+    name: CI Success
+    # Stable required-status-check target: its name never changes when the
+    # test matrix changes, so branch protection can require this one context.
+    # Tighten later (e.g. add hassfest at B5) by extending `needs` + the check.
+    if: ${{ always() }}
+    needs: [lint, test]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify required jobs succeeded
+        run: |
+          if [ "${{ needs.lint.result }}" != "success" ] || [ "${{ needs.test.result }}" != "success" ]; then
+            echo "A required job did not succeed (lint=${{ needs.lint.result }}, test=${{ needs.test.result }})"
+            exit 1
+          fi
+          echo "All required jobs succeeded"

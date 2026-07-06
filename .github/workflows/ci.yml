@@ -46,3 +46,21 @@ jobs:
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
       - name: Test with pytest
         run: pytest
+
+  hassfest:
+    name: Hassfest
+    runs-on: ubuntu-latest
+    # continue-on-error until requirements in manifest.json are pinned (B5)
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: home-assistant/actions/hassfest@master
+
+  hacs:
+    name: HACS
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hacs/action@main
+        with:
+          category: integration

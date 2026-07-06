@@ -44,7 +44,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
           enable-cache: true
       - name: Install dependencies
-        run: uv pip install pytest pytest-asyncio pytest-cov -r requirements.txt
+        run: uv pip install -r requirements-dev.txt
       - name: Test with pytest
         run: uv run pytest --cov=custom_components/andersen_ev --cov-report=term-missing --cov-report=xml
 
@@ -78,7 +78,7 @@ jobs:
           python-version: "3.13"
           enable-cache: true
       - name: Install dependencies
-        run: uv pip install mypy -r requirements.txt
+        run: uv pip install -r requirements-dev.txt
       - name: Run mypy
         run: uv run mypy custom_components/andersen_ev
 

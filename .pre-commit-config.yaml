@@ -1,0 +1,14 @@
+# Pre-commit hooks mirroring the CI lint job (.github/workflows/ci.yml).
+# ruff rev is pinned to match requirements-dev.txt so local == CI.
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.0
+    hooks:
+      - id: ruff
+        name: ruff check
+        args: ["--config", "custom_components/andersen_ev/ruff.toml"]
+        files: ^custom_components/andersen_ev/.*\.py$
+      - id: ruff-format
+        name: ruff format
+        args: ["--config", "custom_components/andersen_ev/ruff.toml"]
+        files: ^custom_components/andersen_ev/.*\.py$

@@ -74,6 +74,26 @@ data:
   device_id: "YOUR_DEVICE_ID"
 ```
 
+## Development
+
+### pre-commit
+
+This repo ships a `.pre-commit-config.yaml` that runs the same ruff lint and
+format checks as CI (pinned to the same ruff version), so issues are caught
+locally before you push. To enable it:
+
+```bash
+pip install pre-commit   # or: pip install -r requirements-dev.txt
+pre-commit install
+```
+
+The hooks then run automatically on `git commit`. To run them across the
+integration source on demand:
+
+```bash
+pre-commit run --all-files
+```
+
 ## Future development
 Frankly depends on whether or not I sell my house (with the charger).
 

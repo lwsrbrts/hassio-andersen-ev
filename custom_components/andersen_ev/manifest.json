@@ -1,7 +1,7 @@
 {
   "domain": "andersen_ev",
   "name": "Andersen EV",
-  "codeowners": ["@lwsrbrts", "@toby200"],
+  "codeowners": ["@lwsrbrts", "@toby200", "@michaeln31"],
   "config_flow": true,
   "dependencies": [],
   "documentation": "https://github.com/HA-AndersenEV/hassio-andersen-ev",

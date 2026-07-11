@@ -193,9 +193,7 @@ class GraphQLClient:
                 _LOGGER.warning("Failed %s, HTTP status code: %s", label, err.code)
                 return None
             _LOGGER.debug("Token expired during %s, refreshing and retrying", label)
-            return await self._refresh_and_retry(
-                document, variable_values, wire_op_name, label
-            )
+            return await self._refresh_and_retry(document, variable_values, wire_op_name, label)
         except TransportQueryError as err:
             unauthenticated = any(
                 (
@@ -211,12 +209,8 @@ class GraphQLClient:
             if not unauthenticated:
                 _LOGGER.warning("GraphQL errors in %s: %s", label, err.errors)
                 return None
-            _LOGGER.info(
-                "Authentication error during %s, refreshing and retrying", label
-            )
-            return await self._refresh_and_retry(
-                document, variable_values, wire_op_name, label
-            )
+            _LOGGER.info("Authentication error during %s, refreshing and retrying", label)
+            return await self._refresh_and_retry(document, variable_values, wire_op_name, label)
         except OSError as err:
             _LOGGER.error("Error executing GraphQL %s: %s", label, err)
             return None
@@ -333,9 +327,7 @@ class GraphQLClient:
     def _create_refresh_task(self) -> None:
         """Create a task for proactive token refresh, storing the reference."""
         self._refresh_task = asyncio.create_task(self._proactive_refresh())
-        self._refresh_task.add_done_callback(
-            lambda _: setattr(self, "_refresh_task", None)
-        )
+        self._refresh_task.add_done_callback(lambda _: setattr(self, "_refresh_task", None))
 
     async def _proactive_refresh(self) -> None:
         """Proactive refresh triggered by the scheduled timer."""

@@ -2,12 +2,12 @@
 ![Andersen Logo](/images/dark_logo.png)
 
 ## Status
-![Tests](https://github.com/HA-AndersenEV/hassio-andersen-ev/actions/workflows/python-app.yml/badge.svg?branch=main)
+![CI](https://github.com/HA-AndersenEV/hassio-andersen-ev/actions/workflows/ci.yml/badge.svg?branch=main)
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/hacs/integration)
 [![GitHub Release](https://img.shields.io/github/v/release/HA-AndersenEV/hassio-andersen-ev)](https://github.com/HA-AndersenEV/hassio-andersen-ev/releases)
 [![Integration Usage](https://img.shields.io/badge/dynamic/json?color=41BDF5&logo=home-assistant&label=integration%20usage&suffix=%20installs&cacheSeconds=15600&url=https://analytics.home-assistant.io/custom_integrations.json&query=$.andersen_ev.total)
 
-### Beta 0.6.5.1
+### 0.7.1
 
 ## Features
 * Switch entities for each charging schedule allows enabling/disabling charge schedules.
@@ -26,7 +26,7 @@
 1. Make sure [HACS](https://hacs.xyz/) is installed in your Home Assistant instance.
 2. Add this repository as a custom repository in HACS:
    - Navigate to HACS → Integrations → Menu (⋮) → Custom repositories
-   - Add `https://github.com/lwsrbrts/hassio-andersen-ev` as a repository
+   - Add `https://github.com/HA-AndersenEV/hassio-andersen-ev` as a repository
    - Select `Integration` as the category
 3. Click "Add"
 4. Search for "Andersen EV" in HACS and install it
@@ -74,10 +74,40 @@ data:
   device_id: "YOUR_DEVICE_ID"
 ```
 
+## Contributing
+Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for the branch model, commit
+conventions, and release process before opening a pull request.
+
+## Development
+
+### pre-commit
+
+This repo ships a `.pre-commit-config.yaml` that runs the same ruff lint and
+format checks as CI (pinned to the same ruff version), so issues are caught
+locally before you push. To enable it:
+
+```bash
+pip install pre-commit   # or: pip install -r requirements-dev.txt
+pre-commit install
+```
+
+The hooks then run automatically on `git commit`. To run them across the
+integration source on demand:
+
+```bash
+pre-commit run --all-files
+```
+
 ## Future development
 Frankly depends on whether or not I sell my house (with the charger).
 
 ## Changelog
+### 0.7.1
+* Development & CI tooling hardening (no functional integration changes):
+  * Replaced flake8 with ruff (lint + format check), added a `.pre-commit-config.yaml`.
+  * CI now runs a Python 3.13/3.14 matrix with coverage, plus hassfest and HACS validation.
+  * Added a devcontainer for local parity with CI, dependabot, and a seeded quality_scale.yaml.
+
 ### 0.6.5.1
 * Fix breaking bug in 0.6.5
 

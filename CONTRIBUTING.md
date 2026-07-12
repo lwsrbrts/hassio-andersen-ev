@@ -4,16 +4,13 @@ Thanks for your interest in contributing to the Andersen EV Home Assistant integ
 
 ## Branch model
 
-The primary branch is **`main`** — the stable trunk. Contributions normally target `main` via pull
-request; direct pushes are not used.
+**`main`** is the sole trunk and the stable release branch. All work lands on `main` through pull
+requests; it is branch-protected and direct pushes are not used.
 
-**`develop`** is an *optional* beta/staging branch. It is used only when a change should first go out
-as a `-beta.N` prerelease for testing before it lands on `main`. In that case the change is merged to
-`develop` (which publishes a beta prerelease), tested, and then `develop` is promoted to `main` for the
-stable release. When no beta is needed, PRs go straight to `main`.
+Contributor flow: fork the repo -> create a feature branch -> open a PR into `main`.
 
-Contributor flow: fork the repo -> create a feature branch -> open a PR into `main` (or into
-`develop` if you want a beta test first).
+Betas are cut on demand via the "Cut beta" GitHub Actions workflow (`workflow_dispatch`). See
+"Releases & versioning" below for how betas and stable releases are produced.
 
 ## Commit messages
 
@@ -52,8 +49,11 @@ See the README's [Development](README.md#development) section for full details. 
 
 ## Releases & versioning
 
-This project follows [Semantic Versioning](https://semver.org/). Merges to `main` cut stable
-releases. When a change should be beta-tested first, merging it to the optional `develop` branch
-cuts a `-beta.N` prerelease; promoting `develop -> main` then cuts the stable release. Both are
-produced automatically by `release-please` (landing in an upcoming PR). Until that automation is in
-place, versions are bumped manually in `custom_components/andersen_ev/manifest.json`.
+This project follows [Semantic Versioning](https://semver.org/). `release-please` is now active.
+Merges to `main` are driven by Conventional Commits: `release-please` maintains a rolling release PR
+that bumps the version in `custom_components/andersen_ev/manifest.json`, updates `CHANGELOG.md`, and
+tags `vX.Y.Z` when merged. Merging that release PR promotes the change to a stable release.
+
+To beta-test a change before promoting it, run the "Cut beta" workflow to publish a
+`vX.Y.Z-beta.N` pre-release. Enable HACS "Show beta versions" for this repository to receive it;
+stable users are unaffected.

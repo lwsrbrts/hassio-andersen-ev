@@ -9,5 +9,5 @@
   "iot_class": "cloud_polling",
   "issue_tracker": "https://github.com/HA-AndersenEV/hassio-andersen-ev/issues",
   "requirements": ["pycognito", "gql[aiohttp]", "boto3"],
-  "version": "0.7.1"
+  "version": "0.8.0"
 }

@@ -1,0 +1,92 @@
+name: Cut beta
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_version:
+        description: >-
+          Base semver for the beta (defaults to manifest.json version).
+          Tag will be v<base_version>-beta.<run_number>.
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+jobs:
+  cut-beta:
+    name: Cut beta pre-release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Resolve base version and beta tag
+        id: ver
+        env:
+          INPUT_BASE_VERSION: ${{ github.event.inputs.base_version }}
+          RUN_NUMBER: ${{ github.run_number }}
+        run: |
+          set -euo pipefail
+          manifest="custom_components/andersen_ev/manifest.json"
+          if [ -n "$INPUT_BASE_VERSION" ]; then
+            base="$INPUT_BASE_VERSION"
+          else
+            base="$(python -c "import json;print(json.load(open('$manifest'))['version'])")"
+          fi
+          beta="${base}-beta.${RUN_NUMBER}"
+          tag="v${beta}"
+          echo "base=$base" >> "$GITHUB_OUTPUT"
+          echo "beta=$beta" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "Beta version: $beta (tag $tag)"
+
+      - name: Bump manifest to beta version on a throwaway commit (not pushed to main)
+        id: commit
+        env:
+          BETA_VERSION: ${{ steps.ver.outputs.beta }}
+        run: |
+          set -euo pipefail
+          manifest="custom_components/andersen_ev/manifest.json"
+          python - "$manifest" "$BETA_VERSION" <<'PY'
+          import json, sys
+          path, ver = sys.argv[1], sys.argv[2]
+          with open(path) as f:
+              data = json.load(f)
+          data["version"] = ver
+          with open(path, "w") as f:
+              json.dump(data, f, indent=2)
+              f.write("\n")
+          PY
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$manifest"
+          git commit -m "chore: set manifest version to ${BETA_VERSION} (beta artifact)"
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Create and push beta tag (points only at the throwaway commit)
+        env:
+          TAG: ${{ steps.ver.outputs.tag }}
+          SHA: ${{ steps.commit.outputs.sha }}
+        run: |
+          set -euo pipefail
+          git tag "$TAG" "$SHA"
+          git push origin "$TAG"
+
+      - name: Publish GitHub pre-release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.ver.outputs.tag }}
+          SHA: ${{ steps.commit.outputs.sha }}
+          BASE: ${{ steps.ver.outputs.base }}
+          RUN_NUMBER: ${{ github.run_number }}
+        run: |
+          set -euo pipefail
+          gh release create "$TAG" \
+            --prerelease \
+            --target "$SHA" \
+            --title "$TAG" \
+            --notes "Beta pre-release of ${BASE} (build ${RUN_NUMBER}). Install via HACS with \"Show beta versions\" enabled for this repository."

@@ -7,7 +7,7 @@
 [![GitHub Release](https://img.shields.io/github/v/release/HA-AndersenEV/hassio-andersen-ev)](https://github.com/HA-AndersenEV/hassio-andersen-ev/releases)
 [![Integration Usage](https://img.shields.io/badge/dynamic/json?color=41BDF5&logo=home-assistant&label=integration%20usage&suffix=%20installs&cacheSeconds=15600&url=https://analytics.home-assistant.io/custom_integrations.json&query=$.andersen_ev.total)
 
-### 0.7.1
+### 0.8.0
 
 ## Features
 * Switch entities for each charging schedule allows enabling/disabling charge schedules.
@@ -33,6 +33,12 @@
 5. Restart Home Assistant
 6. Add the integration via the Home Assistant UI (Settings → Devices & Services → Add Integration)
 7. Search for "Andersen EV" and follow the configuration steps
+
+### Testing beta releases
+
+To receive beta pre-releases, open this repository in HACS and enable "Show beta versions" for it.
+Beta builds are published on demand via the "Cut beta" workflow and are tagged `vX.Y.Z-beta.N`.
+Stable users who leave "Show beta versions" disabled are unaffected.
 
 ### Manual Installation
 
@@ -102,6 +108,11 @@ pre-commit run --all-files
 Frankly depends on whether or not I sell my house (with the charger).
 
 ## Changelog
+### 0.8.0
+* Automated release pipeline: release-please drives stable releases from Conventional Commits on `main`.
+* On-demand beta pre-releases via a manual "Cut beta" workflow (enable HACS "Show beta versions" to receive them).
+* Consolidated onto a single `main` branch (the `develop` beta branch is retired).
+
 ### 0.7.1
 * Development & CI tooling hardening (no functional integration changes):
   * Replaced flake8 with ruff (lint + format check), added a `.pre-commit-config.yaml`.

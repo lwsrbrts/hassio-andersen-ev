@@ -33,6 +33,12 @@ jobs:
   test:
     name: Test (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
+    # litellm ships a Rust/PyO3 native build (pulled transitively via
+    # homeassistant -> hass-nabucasa) whose PyO3 has no Python 3.14 support yet,
+    # so the 3.14 install fails at the native build. Build against the stable ABI
+    # instead. Remove once litellm publishes 3.14-compatible wheels.
+    env:
+      PYO3_USE_ABI3_FORWARD_COMPATIBILITY: "1"
     strategy:
       matrix:
         python-version: ["3.13", "3.14"]

@@ -21,9 +21,6 @@ get_device_info:
       example: "1b6f9e38a4d72c0f5e831649"
       selector:
         text: {}
-  response:
-    name: Device Information
-    description: Returns detailed information about the selected Andersen EV charger
 
 get_device_status:
   name: Get Device Status
@@ -36,9 +33,6 @@ get_device_status:
       example: "1b6f9e38a4d72c0f5e831649"
       selector:
         text: {}
-  response:
-    name: Device Status
-    description: Returns detailed status for the selected Andersen EV charger
 
 reset_rcm:
   name: Reset RCM Fault

@@ -1,0 +1,110 @@
+name: CI
+
+on:
+  push:
+    branches: ["develop", "main"]
+  pull_request:
+    branches: ["develop", "main"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.13"
+      - name: Install ruff
+        run: pip install ruff==0.15.0
+      - name: Check with ruff
+        run: ruff check --config custom_components/andersen_ev/ruff.toml custom_components/andersen_ev
+      - name: Check formatting with ruff
+        run: ruff format --check --config custom_components/andersen_ev/ruff.toml custom_components/andersen_ev
+
+  test:
+    name: Test (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    # litellm ships a Rust/PyO3 native build (pulled transitively via
+    # homeassistant -> hass-nabucasa) whose PyO3 has no Python 3.14 support yet,
+    # so the 3.14 install fails at the native build. Build against the stable ABI
+    # instead. Remove once litellm publishes 3.14-compatible wheels.
+    env:
+      PYO3_USE_ABI3_FORWARD_COMPATIBILITY: "1"
+    strategy:
+      matrix:
+        python-version: ["3.13", "3.14"]
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: Set up uv
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+        with:
+          python-version: ${{ matrix.python-version }}
+          enable-cache: true
+      - name: Create venv
+        run: uv venv
+      - name: Install dependencies
+        run: uv pip install -r requirements-dev.txt
+      - name: Test with pytest
+        run: uv run pytest --cov=custom_components/andersen_ev --cov-report=term-missing --cov-report=xml
+
+  hassfest:
+    name: Hassfest
+    runs-on: ubuntu-latest
+    # continue-on-error until requirements in manifest.json are pinned (B5)
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: home-assistant/actions/hassfest@f4ca6f671bd429efb108c0f2fa0ae8af0215986c # master @ f4ca6f6 (2026-06-22)
+
+  hacs:
+    name: HACS
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: hacs/action@d556e736723344f83838d08488c983a15381059a # 22.5.0
+        with:
+          category: integration
+
+  typecheck:
+    name: Typecheck
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: Set up uv
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+        with:
+          python-version: "3.13"
+          enable-cache: true
+      - name: Create venv
+        run: uv venv
+      - name: Install dependencies
+        run: uv pip install -r requirements-dev.txt
+      - name: Run mypy
+        run: uv run mypy custom_components/andersen_ev
+
+  ci-success:
+    name: CI Success
+    # Stable required-status-check target: its name never changes when the
+    # test matrix changes, so branch protection can require this one context.
+    # Tighten later (e.g. add hassfest at B5) by extending `needs` + the check.
+    if: ${{ always() }}
+    needs: [lint, test]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify required jobs succeeded
+        run: |
+          if [ "${{ needs.lint.result }}" != "success" ] || [ "${{ needs.test.result }}" != "success" ]; then
+            echo "A required job did not succeed (lint=${{ needs.lint.result }}, test=${{ needs.test.result }})"
+            exit 1
+          fi
+          echo "All required jobs succeeded"

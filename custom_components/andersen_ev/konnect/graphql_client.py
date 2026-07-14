@@ -198,9 +198,7 @@ class GraphQLClient:
             if not self._has_unauthenticated_error(err):
                 _LOGGER.warning("GraphQL errors in %s: %s", label, err.errors)
                 return None
-            _LOGGER.debug(
-                "Authentication error during %s, refreshing and retrying", label
-            )
+            _LOGGER.debug("Authentication error during %s, refreshing and retrying", label)
             return await self._refresh_and_retry(document, variable_values, wire_op_name, label)
         except OSError as err:
             _LOGGER.error("Error executing GraphQL %s: %s", label, err)
@@ -328,9 +326,7 @@ class GraphQLClient:
     def _create_refresh_task(self) -> None:
         """Create a task for proactive token refresh, storing the reference."""
         self._refresh_task = asyncio.create_task(self._proactive_refresh())
-        self._refresh_task.add_done_callback(
-            lambda _: setattr(self, "_refresh_task", None)
-        )
+        self._refresh_task.add_done_callback(lambda _: setattr(self, "_refresh_task", None))
 
     async def _proactive_refresh(self) -> None:
         """Proactive refresh triggered by the scheduled timer."""

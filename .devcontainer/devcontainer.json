@@ -1,0 +1,16 @@
+{
+    "name": "Andersen EV Dev",
+    "image": "mcr.microsoft.com/devcontainers/python:3.13-bookworm",
+    "features": {
+        "ghcr.io/va-h/devcontainers-features/uv:1": {}
+    },
+    "postCreateCommand": "uv pip install --system -r requirements-dev.txt",
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "charliermarsh.ruff",
+                "ms-python.python"
+            ]
+        }
+    }
+}

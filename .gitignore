@@ -116,8 +116,6 @@ virtualization/vagrant/config
 !.vscode/tasks.json
 !.vscode/settings.default.jsonc
 .env
-.devcontainer/
-devcontainer.json
 
 # Windows Explorer
 desktop.ini

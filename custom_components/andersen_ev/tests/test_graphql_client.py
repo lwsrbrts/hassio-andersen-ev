@@ -546,6 +546,38 @@ class TestExecuteDocument:
         assert mock_session.execute.call_count == 2
 
     @pytest.mark.asyncio
+    async def test_execute_document_unauthenticated_retry(self):
+        """Test TransportQueryError with UNAUTHENTICATED code triggers refresh and retry."""
+        from gql import gql as parse_gql
+
+        success_data = {"getDeviceStatus": {"status": "ok"}}
+        mock_client, mock_session = self._make_mock_client(
+            execute_side_effect=[
+                TransportQueryError(
+                    "UNAUTHENTICATED",
+                    errors=[{"extensions": {"code": "UNAUTHENTICATED"}}],
+                ),
+                success_data,
+            ]
+        )
+
+        doc = parse_gql('query { getDeviceStatus(deviceId: "x") { status } }')
+
+        with patch(
+            "andersen_ev.konnect.graphql_client.Client",
+            return_value=mock_client,
+        ):
+            client = GraphQLClient(
+                token="old_token",
+                token_refresh=self._dummy_refresh(),
+            )
+            result = await client.execute_document(doc)
+            await client.close()
+
+        assert result == success_data
+        assert mock_session.execute.call_count == 2
+
+    @pytest.mark.asyncio
     async def test_execute_document_server_error(self):
         """Test non-401 server errors return None."""
         from gql import gql as parse_gql

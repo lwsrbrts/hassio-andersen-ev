@@ -1,13 +1,21 @@
 {
   "domain": "andersen_ev",
   "name": "Andersen EV",
-  "codeowners": ["@lwsrbrts", "@toby200", "@michaeln31"],
+  "codeowners": [
+    "@lwsrbrts",
+    "@toby200",
+    "@michaeln31"
+  ],
   "config_flow": true,
   "dependencies": [],
   "documentation": "https://github.com/HA-AndersenEV/hassio-andersen-ev",
   "integration_type": "hub",
   "iot_class": "cloud_polling",
   "issue_tracker": "https://github.com/HA-AndersenEV/hassio-andersen-ev/issues",
-  "requirements": ["pycognito", "gql[aiohttp]", "boto3"],
-  "version": "0.8.0"
+  "requirements": [
+    "pycognito",
+    "gql[aiohttp]",
+    "boto3"
+  ],
+  "version": "0.8.1"
 }

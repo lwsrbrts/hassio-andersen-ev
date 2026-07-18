@@ -60,6 +60,8 @@ async def async_setup_entry(
 class AndersenEvScheduleSwitch(CoordinatorEntity, SwitchEntity):  # pylint: disable=abstract-method
     """Representation of an Andersen EV charging schedule switch."""
 
+    _attr_has_entity_name = True
+
     def __init__(
         self,
         coordinator: AndersenEvCoordinator,
@@ -72,8 +74,7 @@ class AndersenEvScheduleSwitch(CoordinatorEntity, SwitchEntity):  # pylint: disa
         self._device = device
         self._schedule_index = index
         self._schedule_name = schedule_name
-        # Use standardized naming format: "Friendly Name Schedule X"
-        self._attr_name = f"{device.friendly_name} Schedule {index + 1}"
+        self._attr_name = f"Schedule {index + 1}"
         self._attr_unique_id = f"{device.device_id}_schedule_{index}"
         self._attr_device_info = {
             "identifiers": {(DOMAIN, device.device_id)},

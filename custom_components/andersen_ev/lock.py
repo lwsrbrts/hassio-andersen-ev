@@ -32,12 +32,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
 class AndersenEvLock(CoordinatorEntity, LockEntity):  # pylint: disable=abstract-method
     """Representation of an Andersen EV charging lock."""
 
+    _attr_has_entity_name = True
+
     def __init__(self, coordinator: AndersenEvCoordinator, device) -> None:
         """Initialize the lock."""
         super().__init__(coordinator)
         self._device = device
         self._attr_unique_id = f"{device.device_id}_lock"
-        self._attr_name = f"{device.friendly_name} Lock"
+        self._attr_name = "Lock"
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, device.device_id)},
             name=f"{device.friendly_name} ({device.device_id})",

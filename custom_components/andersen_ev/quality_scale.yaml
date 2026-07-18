@@ -14,12 +14,12 @@ rules:
   docs-removal-instructions: todo
   docs-triggers: todo
   entity-event-setup: todo
-  entity-unique-id: todo
+  entity-unique-id: done
   has-entity-name: todo
   runtime-data: todo
   test-before-configure: todo
   test-before-setup: todo
-  unique-config-entry: todo
+  unique-config-entry: done
 
   # Silver
   action-exceptions: todo

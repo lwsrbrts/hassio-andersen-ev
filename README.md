@@ -80,6 +80,13 @@ data:
   device_id: "YOUR_DEVICE_ID"
 ```
 
+## Removal
+
+1. In Home Assistant, go to **Settings > Devices & Services**.
+2. Click the Andersen EV integration entry, then click **Delete**.
+3. Restart Home Assistant.
+4. (Optional) Uninstall via HACS: navigate to HACS > Integrations, find Andersen EV, and remove it.
+
 ## Contributing
 Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for the branch model, commit
 conventions, and release process before opening a pull request.

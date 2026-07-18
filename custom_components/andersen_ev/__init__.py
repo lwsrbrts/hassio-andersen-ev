@@ -8,7 +8,6 @@ import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, ServiceCall
-from homeassistant.helpers.typing import ConfigType
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import (
@@ -24,16 +23,12 @@ from .konnect.client import KonnectClient
 
 PLATFORMS = [Platform.LOCK, Platform.SENSOR, Platform.SWITCH]
 
+type AndersenEvConfigEntry = ConfigEntry[AndersenEvCoordinator]
+
 _LOGGER = logging.getLogger(__name__)
 
 
-async def async_setup(hass: HomeAssistant, _config: ConfigType) -> bool:
-    """Set up the Andersen EV component."""
-    hass.data[DOMAIN] = {}
-    return True
-
-
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+async def async_setup_entry(hass: HomeAssistant, entry: AndersenEvConfigEntry) -> bool:
     """Set up Andersen EV from a config entry."""
     email = entry.data["email"]
     password = entry.data["password"]
@@ -45,7 +40,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Fetch initial data so we have data when entities subscribe
     await coordinator.async_config_entry_first_refresh()
 
-    hass.data[DOMAIN][entry.entry_id] = coordinator
+    entry.runtime_data = coordinator
 
     # Register services
     async def disable_all_schedules(call: ServiceCall) -> None:
@@ -129,19 +124,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     return True
 
 
-async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+async def async_unload_entry(hass: HomeAssistant, entry: AndersenEvConfigEntry) -> bool:
     """Unload a config entry."""
-    coordinator: AndersenEvCoordinator | None = hass.data[DOMAIN].get(entry.entry_id)
-
-    if coordinator:
-        await asyncio.gather(*(device.close() for device in coordinator.devices), return_exceptions=True)
-
-    unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
-
-    if unload_ok:
-        hass.data[DOMAIN].pop(entry.entry_id)
-
-    return unload_ok
+    await asyncio.gather(*(device.close() for device in entry.runtime_data.devices), return_exceptions=True)
+    return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
 
 
 class AndersenEvCoordinator(DataUpdateCoordinator):

@@ -308,13 +308,15 @@ async def async_setup_entry(
 class AndersenEvBaseSensor(CoordinatorEntity, SensorEntity):
     """Base class for Andersen EV sensors."""
 
+    _attr_has_entity_name = True
+
     def __init__(self, coordinator: AndersenEvCoordinator, device, sensor_type, name_suffix, data_key=None) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator)
         self._device = device
         self._sensor_type = sensor_type
         self._data_key = data_key
-        self._attr_name = f"{device.friendly_name} {name_suffix}"
+        self._attr_name = name_suffix
         self._attr_unique_id = f"{device.device_id}_{sensor_type}"
         self._attr_device_info = {
             "identifiers": {(DOMAIN, device.device_id)},
@@ -430,11 +432,13 @@ class AndersenEvConnectorSensor(CoordinatorEntity, SensorEntity):
         "unknown",
     ]
 
+    _attr_has_entity_name = True
+
     def __init__(self, coordinator: AndersenEvCoordinator, device, icon=None) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator)
         self._device = device
-        self._attr_name = f"{device.friendly_name} Connector"
+        self._attr_name = "Connector"
         self._attr_unique_id = f"{device.device_id}_connector"
         self._attr_device_info = {
             "identifiers": {(DOMAIN, device.device_id)},
@@ -546,6 +550,8 @@ class AndersenEvConnectorSensor(CoordinatorEntity, SensorEntity):
 class AndersenEvChargeStatusSensor(CoordinatorEntity, SensorEntity):
     """Sensor for Andersen EV charge status values."""
 
+    _attr_has_entity_name = True
+
     def __init__(
         self,
         coordinator: AndersenEvCoordinator,
@@ -563,7 +569,7 @@ class AndersenEvChargeStatusSensor(CoordinatorEntity, SensorEntity):
         self._device = device
         self._sensor_type = sensor_type
         self._data_key = data_key
-        self._attr_name = f"{device.friendly_name} {name_suffix}"
+        self._attr_name = name_suffix
         self._attr_unique_id = f"{device.device_id}_{sensor_type}"
         self._attr_device_info = {
             "identifiers": {(DOMAIN, device.device_id)},
@@ -652,6 +658,8 @@ class AndersenEvChargeStatusSensor(CoordinatorEntity, SensorEntity):
 class AndersenEvLiveSensor(CoordinatorEntity, SensorEntity):
     """Sensor for Andersen EV live status values."""
 
+    _attr_has_entity_name = True
+
     def __init__(
         self,
         coordinator: AndersenEvCoordinator,
@@ -669,7 +677,7 @@ class AndersenEvLiveSensor(CoordinatorEntity, SensorEntity):
         self._device = device
         self._sensor_type = sensor_type
         self._data_key = data_key
-        self._attr_name = f"{device.friendly_name} {name_suffix}"
+        self._attr_name = name_suffix
         self._attr_unique_id = f"{device.device_id}_{sensor_type}"
         self._attr_device_info = {
             "identifiers": {(DOMAIN, device.device_id)},

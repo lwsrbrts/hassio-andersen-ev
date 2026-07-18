@@ -59,8 +59,6 @@ jobs:
   hassfest:
     name: Hassfest
     runs-on: ubuntu-latest
-    # continue-on-error until requirements in manifest.json are pinned (B5)
-    continue-on-error: true
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - uses: home-assistant/actions/hassfest@f4ca6f671bd429efb108c0f2fa0ae8af0215986c # master @ f4ca6f6 (2026-06-22)
@@ -96,15 +94,14 @@ jobs:
     name: CI Success
     # Stable required-status-check target: its name never changes when the
     # test matrix changes, so branch protection can require this one context.
-    # Tighten later (e.g. add hassfest at B5) by extending `needs` + the check.
     if: ${{ always() }}
-    needs: [lint, test]
+    needs: [lint, test, hassfest, hacs]
     runs-on: ubuntu-latest
     steps:
       - name: Verify required jobs succeeded
         run: |
-          if [ "${{ needs.lint.result }}" != "success" ] || [ "${{ needs.test.result }}" != "success" ]; then
-            echo "A required job did not succeed (lint=${{ needs.lint.result }}, test=${{ needs.test.result }})"
+          if [ "${{ needs.lint.result }}" != "success" ] || [ "${{ needs.test.result }}" != "success" ] || [ "${{ needs.hassfest.result }}" != "success" ] || [ "${{ needs.hacs.result }}" != "success" ]; then
+            echo "A required job did not succeed (lint=${{ needs.lint.result }}, test=${{ needs.test.result }}, hassfest=${{ needs.hassfest.result }}, hacs=${{ needs.hacs.result }})"
             exit 1
           fi
           echo "All required jobs succeeded"

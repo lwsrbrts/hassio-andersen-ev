@@ -17,5 +17,6 @@
     "gql[aiohttp]",
     "boto3"
   ],
+  "single_config_entry": true,
   "version": "0.8.1"
 }

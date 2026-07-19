@@ -54,7 +54,7 @@ jobs:
       - name: Install dependencies
         run: uv pip install -r requirements-dev.txt
       - name: Test with pytest
-        run: uv run pytest --cov=custom_components/andersen_ev --cov-report=term-missing --cov-report=xml
+        run: uv run pytest --cov=custom_components/andersen_ev --cov-report=term-missing --cov-report=xml --cov-fail-under=95
 
   hassfest:
     name: Hassfest

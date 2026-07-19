@@ -8,6 +8,7 @@ from typing import Any
 
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -160,11 +161,7 @@ class AndersenEvScheduleSwitch(CoordinatorEntity, SwitchEntity):  # pylint: disa
                     or "deviceStatus" not in device_info
                     or "scheduleSlotsArray" not in device_info["deviceStatus"]
                 ):
-                    _LOGGER.warning(
-                        "Failed to get schedule slots for %s",
-                        self._device.friendly_name,
-                    )
-                    return
+                    raise HomeAssistantError("Failed to retrieve schedule data")
                 schedule_slots = copy.deepcopy(device_info["deviceStatus"]["scheduleSlotsArray"])
             else:
                 # Use the data from the coordinator
@@ -201,16 +198,12 @@ class AndersenEvScheduleSwitch(CoordinatorEntity, SwitchEntity):  # pylint: disa
                     # Request a refresh of the coordinator data to update all entities
                     await self.coordinator.async_request_refresh()
                 else:
-                    _LOGGER.warning(
-                        "Failed to update schedule state for %s Schedule %s",
-                        self._device.friendly_name,
-                        self._schedule_index + 1,
-                    )
+                    raise HomeAssistantError(f"Failed to update schedule for {self._device.friendly_name}")
             else:
-                _LOGGER.warning("Schedule index %s out of range", self._schedule_index)
+                raise HomeAssistantError(f"Schedule index {self._schedule_index} out of range")
 
-        except Exception as err:  # noqa: BLE001  # pylint: disable=broad-exception-caught
-            _LOGGER.error("Error setting schedule state: %s", err)
+        except Exception as err:  # pylint: disable=broad-exception-caught
+            raise HomeAssistantError(f"Failed to update schedule: {err}") from err
 
     async def _send_set_schedules_mutation(self, schedule_slots, enabled=None) -> bool:
         """Send the setSchedules mutation to the Andersen EV API."""

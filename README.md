@@ -8,7 +8,7 @@
 [![GitHub Release](https://img.shields.io/github/v/release/HA-AndersenEV/hassio-andersen-ev)](https://github.com/HA-AndersenEV/hassio-andersen-ev/releases)
 [![Integration Usage](https://img.shields.io/badge/dynamic/json?color=41BDF5&logo=home-assistant&label=integration%20usage&suffix=%20installs&cacheSeconds=15600&url=https://analytics.home-assistant.io/custom_integrations.json&query=$.andersen_ev.total)
 
-### 0.8.0
+See [CHANGELOG.md](CHANGELOG.md) for release history.
 
 ## Features
 * Switch entities for each charging schedule allows enabling/disabling charge schedules.

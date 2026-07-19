@@ -20,6 +20,7 @@ from .const import (
     SERVICE_RCM_RESET,
 )
 from .konnect.client import KonnectClient
+from .konnect.exceptions import AndersenError
 
 PLATFORMS = [Platform.LOCK, Platform.SENSOR, Platform.SWITCH]
 
@@ -152,7 +153,7 @@ class AndersenEvCoordinator(DataUpdateCoordinator):
         """Fetch data from API endpoint."""
         try:
             devices = await self.client.getDevices()
-        except Exception as err:
+        except AndersenError as err:
             if self.devices:
                 _LOGGER.warning("API error, using cached device data: %s", err)
                 return self.devices

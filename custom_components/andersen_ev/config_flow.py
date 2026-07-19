@@ -12,6 +12,7 @@ from .const import CONF_EMAIL, CONF_PASSWORD, DOMAIN
 
 # Import the konnect module from the local directory
 from .konnect.client import KonnectClient
+from .konnect.exceptions import AndersenAuthError, AndersenConnectionError, AndersenError
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -39,10 +40,11 @@ async def validate_input(_hass: HomeAssistant, data):
 
         # Return info to be stored in the config entry
         return {"title": f"Andersen EV ({data[CONF_EMAIL]})"}
-    except Exception as e:
-        _LOGGER.error("Authentication error: %s", str(e))
-        if "Incorrect email address" in str(e) or "Failed to sign in" in str(e):
-            raise InvalidAuth from e
+    except AndersenAuthError as e:
+        _LOGGER.error("Authentication error: %s", e)
+        raise InvalidAuth from e
+    except (AndersenConnectionError, AndersenError) as e:
+        _LOGGER.error("Connection error: %s", e)
         raise CannotConnect from e
 
 

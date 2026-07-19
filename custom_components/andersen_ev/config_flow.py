@@ -46,6 +46,9 @@ async def validate_input(_hass: HomeAssistant, data):
     except (AndersenConnectionError, AndersenError) as e:
         _LOGGER.error("Connection error: %s", e)
         raise CannotConnect from e
+    except Exception as e:
+        _LOGGER.error("Unexpected error during validation: %s", e)
+        raise CannotConnect from e
 
 
 class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # pylint: disable=abstract-method

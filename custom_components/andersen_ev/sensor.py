@@ -475,7 +475,7 @@ class AndersenEvConnectorSensor(CoordinatorEntity, SensorEntity):
         for device in self.coordinator.data:
             if device.device_id == self._device.device_id:
                 self._device = device
-                return self.coordinator.last_update_success
+                return self.coordinator.last_update_success and self._device.status_available
         return False
 
     @property
@@ -610,7 +610,7 @@ class AndersenEvChargeStatusSensor(CoordinatorEntity, SensorEntity):
                 self._device = device
                 # Check if chargeStatus exists in last_status
                 if self._device.last_status and "chargeStatus" in self._device.last_status:
-                    return self.coordinator.last_update_success
+                    return self.coordinator.last_update_success and self._device.status_available
         return False
 
     @property
@@ -718,7 +718,7 @@ class AndersenEvLiveSensor(CoordinatorEntity, SensorEntity):
                 self._device = device
                 if self._device.last_status and self._data_key in self._device.last_status:
                     _LOGGER.debug("Live available for %s is %s", self._data_key, self.coordinator.last_update_success)
-                    return self.coordinator.last_update_success
+                    return self.coordinator.last_update_success and self._device.status_available
         return False
 
     @property

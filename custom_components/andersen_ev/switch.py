@@ -115,7 +115,7 @@ class AndersenEvScheduleSwitch(CoordinatorEntity, SwitchEntity):  # pylint: disa
         for device in self.coordinator.data:
             if device.device_id == self._device.device_id:
                 self._device = device
-                return self.coordinator.last_update_success
+                return self.coordinator.last_update_success and self._device.status_available
         return False
 
     @property

@@ -144,6 +144,7 @@ class AndersenEvCoordinator(DataUpdateCoordinator):
         super().__init__(hass, _LOGGER, name=DOMAIN, update_interval=timedelta(seconds=DEFAULT_SCAN_INTERVAL))
         self.client = client
         self.devices = []
+        self._device_availability: dict[str, bool] = {}
 
     async def async_request_refresh(self) -> None:
         """Request a data refresh after a short delay.
@@ -192,8 +193,27 @@ class AndersenEvCoordinator(DataUpdateCoordinator):
                 "Device ID: %s, Name: %s, User Lock: %s", device.device_id, device.friendly_name, device.user_lock
             )
             try:
-                await device.get_detailed_device_status()
-            except UpdateFailed:
-                _LOGGER.debug("Error getting status for %s", device.friendly_name)
+                status = await device.get_detailed_device_status()
+            except Exception as err:  # noqa: BLE001
+                self._mark_device_unavailable(device, err)
+                continue
+
+            if status is None:
+                self._mark_device_unavailable(device, "no status returned")
+                continue
+
+            device.status_available = True
+            if self._device_availability.get(device.device_id) is False:
+                _LOGGER.info("Device %s is back online", device.friendly_name)
+            self._device_availability[device.device_id] = True
 
         return self.devices
+
+    def _mark_device_unavailable(self, device, error) -> None:
+        """Mark a device unavailable and log once per transition."""
+        device.status_available = False
+        if self._device_availability.get(device.device_id, True):
+            _LOGGER.warning("Device %s is unavailable: %s", device.friendly_name, error)
+        else:
+            _LOGGER.debug("Device %s still unavailable: %s", device.friendly_name, error)
+        self._device_availability[device.device_id] = False

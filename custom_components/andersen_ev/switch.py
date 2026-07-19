@@ -16,6 +16,8 @@ from . import AndersenEvConfigEntry, AndersenEvCoordinator
 from .const import DOMAIN
 from .konnect import const
 
+PARALLEL_UPDATES = 1
+
 _LOGGER = logging.getLogger(__name__)
 
 

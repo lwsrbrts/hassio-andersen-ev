@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.10.0](https://github.com/HA-AndersenEV/hassio-andersen-ev/compare/v0.9.0...v0.10.0) (2026-07-19)
+
+
+### Features
+
+* allow concurrent entity updates per platform ([#64](https://github.com/HA-AndersenEV/hassio-andersen-ev/issues/64)) ([b020f8f](https://github.com/HA-AndersenEV/hassio-andersen-ev/commit/b020f8f9703cd6cb8f3e0d9ccba32035bf2b9356))
+* clearer error reporting during sign-in ([#58](https://github.com/HA-AndersenEV/hassio-andersen-ev/issues/58)) ([5a1dcdb](https://github.com/HA-AndersenEV/hassio-andersen-ev/commit/5a1dcdbff8c7b0aacdd12a9567f796ab9be4ecb4))
+* mark charger unavailable when the API is unreachable ([#63](https://github.com/HA-AndersenEV/hassio-andersen-ev/issues/63)) ([b7524a8](https://github.com/HA-AndersenEV/hassio-andersen-ev/commit/b7524a8138c7398333097bf6377e582b59229d90))
+* prompt to re-enter password when credentials expire ([#60](https://github.com/HA-AndersenEV/hassio-andersen-ev/issues/60)) ([bad9aef](https://github.com/HA-AndersenEV/hassio-andersen-ev/commit/bad9aef4615e7347980929375f81885756bf62b0))
+* raise errors to the user when service actions fail ([#62](https://github.com/HA-AndersenEV/hassio-andersen-ev/issues/62)) ([26926e6](https://github.com/HA-AndersenEV/hassio-andersen-ev/commit/26926e686385f5bb69d6b3215b64b100766e5d67))
+
 ## [0.9.0](https://github.com/HA-AndersenEV/hassio-andersen-ev/compare/v0.8.1...v0.9.0) (2026-07-18)
 
 

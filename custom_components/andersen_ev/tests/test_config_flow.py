@@ -17,6 +17,7 @@ from homeassistant.data_entry_flow import FlowResultType
 
 from andersen_ev.config_flow import CannotConnect, ConfigFlow, InvalidAuth, validate_input
 from andersen_ev.const import CONF_EMAIL, CONF_PASSWORD
+from andersen_ev.konnect.exceptions import AndersenAuthError, AndersenConnectionError
 
 MANIFEST_PATH = Path(__file__).parent.parent / "manifest.json"
 
@@ -62,15 +63,22 @@ class TestValidateInput:
 
     @pytest.mark.asyncio
     async def test_sign_in_failure_raises_invalid_auth(self):
-        """A 'Failed to sign in' auth error is mapped to InvalidAuth."""
-        with _patch_konnect_client(auth_error=Exception("Failed to sign in")):
+        """An AndersenAuthError from authenticate_user is mapped to InvalidAuth."""
+        with _patch_konnect_client(auth_error=AndersenAuthError("Failed to sign in")):
             with pytest.raises(InvalidAuth):
                 await validate_input(None, {CONF_EMAIL: "test@example.com", CONF_PASSWORD: "wrong"})
 
     @pytest.mark.asyncio
+    async def test_connection_failure_raises_cannot_connect(self):
+        """An AndersenConnectionError is mapped to CannotConnect."""
+        with _patch_konnect_client(auth_error=AndersenConnectionError("network unreachable")):
+            with pytest.raises(CannotConnect):
+                await validate_input(None, {CONF_EMAIL: "test@example.com", CONF_PASSWORD: "testpass"})
+
+    @pytest.mark.asyncio
     async def test_unexpected_failure_raises_cannot_connect(self):
-        """An unrecognized error is mapped to CannotConnect."""
-        with _patch_konnect_client(auth_error=Exception("network unreachable")):
+        """An unrecognized (non-Andersen) error is still mapped to CannotConnect."""
+        with _patch_konnect_client(auth_error=Exception("something unexpected")):
             with pytest.raises(CannotConnect):
                 await validate_input(None, {CONF_EMAIL: "test@example.com", CONF_PASSWORD: "testpass"})
 
@@ -120,7 +128,7 @@ class TestAsyncStepUser:
         flow = _make_flow()
         user_input = {CONF_EMAIL: "test@example.com", CONF_PASSWORD: "wrong"}
 
-        with _patch_konnect_client(auth_error=Exception("Failed to sign in")):
+        with _patch_konnect_client(auth_error=AndersenAuthError("Failed to sign in")):
             result = await flow.async_step_user(user_input)
 
         assert result["type"] is FlowResultType.FORM
@@ -130,11 +138,11 @@ class TestAsyncStepUser:
 
     @pytest.mark.asyncio
     async def test_cannot_connect_shows_form_error_without_setting_unique_id(self):
-        """A generic failure re-shows the form and never touches the unique id."""
+        """A connection failure re-shows the form and never touches the unique id."""
         flow = _make_flow()
         user_input = {CONF_EMAIL: "test@example.com", CONF_PASSWORD: "testpass"}
 
-        with _patch_konnect_client(auth_error=Exception("boom")):
+        with _patch_konnect_client(auth_error=AndersenConnectionError("boom")):
             result = await flow.async_step_user(user_input)
 
         assert result["type"] is FlowResultType.FORM

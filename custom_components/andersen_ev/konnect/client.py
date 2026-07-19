@@ -9,6 +9,7 @@ from pycognito.aws_srp import AWSSRP
 
 from . import const
 from .device import KonnectDevice
+from .exceptions import AndersenAuthError, AndersenConnectionError
 
 POOL_ID = "eu-west-1_t5HV3bFjl"
 POOL_REGION = "eu-west-1"
@@ -82,7 +83,7 @@ class KonnectClient:
 
         except Exception as e:
             _LOGGER.error("Authentication failed: %s", str(e))
-            raise RuntimeError(f"Failed to sign in: {e!s}") from e
+            raise AndersenAuthError(f"Failed to sign in: {e!s}") from e
 
     def __authenticate_with_aws_srp(self):
         # This is executed in the executor pool
@@ -195,7 +196,7 @@ class KonnectClient:
                 response.status_code,
                 response.text,
             )
-            return devices
+            raise AndersenConnectionError(f"API returned status {response.status_code}")
 
         response_body = response.json()
 
@@ -230,13 +231,13 @@ class KonnectClient:
         )
 
         if response.status_code != 200:
-            raise RuntimeError("Incorrect email address")
+            raise AndersenAuthError("Incorrect email address")
 
         # {'error': 'Pending user with email "x" not found'}
         # {'username': 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx:x'}
         response_body = response.json()
         if "username" not in response_body:
-            raise RuntimeError("Incorrect email address")
+            raise AndersenAuthError("Incorrect email address")
 
         return response_body["username"]
 

@@ -375,7 +375,7 @@ class TestSetScheduleEnabled:
     async def test_formatted_slots_are_deep_copied_from_source(self):
         captured = {}
 
-        async def capture_mutation(slots, **_kwargs):
+        async def capture_mutation(slots, *_args, **_kwargs):
             captured["slots"] = slots
             return True
 

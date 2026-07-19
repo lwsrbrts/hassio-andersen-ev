@@ -209,9 +209,10 @@ class TestIsLocked:
             def __bool__(self):
                 return True
 
-        device = _make_device(last_status=RaisingStatus(), user_lock=False)
+        device = _make_device(last_status=None, user_lock=False)
         coordinator = _make_coordinator([device])
         lock = AndersenEvLock(coordinator, device)
+        lock._device.last_status = RaisingStatus()
 
         assert lock.is_locked is True
 

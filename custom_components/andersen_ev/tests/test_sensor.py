@@ -103,13 +103,13 @@ class TestBaseSensorInit:
 
         assert sensor._attr_icon == "mdi:custom"
 
-    def test_icon_not_overridden_when_absent(self):
+    def test_icon_not_set_when_absent(self):
         device = _make_device()
         coordinator = _make_coordinator([device])
 
         sensor = AndersenEvEnergySensor(coordinator, device, "energy", "Total Energy", "chargeEnergyTotal")
 
-        assert sensor._attr_icon != "mdi:custom"
+        assert not hasattr(sensor, "_attr_icon")
 
 
 class TestBaseSensorUpdateModelFromDeviceStatus:
@@ -607,28 +607,56 @@ class TestChargeStatusSensorNativeValue:
     def test_returns_value_from_charge_status(self):
         device = _make_device(last_status={"chargeStatus": {"chargePower": 2500}})
         coordinator = _make_coordinator([device])
-        sensor = AndersenEvChargeStatusSensor(coordinator, device, "charge_power", "Charge Power", "chargePower")
+        sensor = AndersenEvChargeStatusSensor(
+            coordinator,
+            device,
+            "charge_power",
+            "Charge Power",
+            "chargePower",
+            device_class=SensorDeviceClass.POWER,
+        )
 
         assert sensor.native_value == 2500
 
     def test_returns_none_when_data_key_missing(self):
         device = _make_device(last_status={"chargeStatus": {}})
         coordinator = _make_coordinator([device])
-        sensor = AndersenEvChargeStatusSensor(coordinator, device, "charge_power", "Charge Power", "chargePower")
+        sensor = AndersenEvChargeStatusSensor(
+            coordinator,
+            device,
+            "charge_power",
+            "Charge Power",
+            "chargePower",
+            device_class=SensorDeviceClass.POWER,
+        )
 
         assert sensor.native_value is None
 
     def test_returns_none_when_charge_status_missing(self):
         device = _make_device(last_status={"other": True})
         coordinator = _make_coordinator([device])
-        sensor = AndersenEvChargeStatusSensor(coordinator, device, "charge_power", "Charge Power", "chargePower")
+        sensor = AndersenEvChargeStatusSensor(
+            coordinator,
+            device,
+            "charge_power",
+            "Charge Power",
+            "chargePower",
+            device_class=SensorDeviceClass.POWER,
+        )
 
         assert sensor.native_value is None
 
     def test_returns_none_when_no_status(self):
         device = _make_device(last_status=None)
         coordinator = _make_coordinator([device])
-        sensor = AndersenEvChargeStatusSensor(coordinator, device, "charge_power", "Charge Power", "chargePower")
+        sensor = AndersenEvChargeStatusSensor(
+            coordinator,
+            device,
+            "charge_power",
+            "Charge Power",
+            "chargePower",
+            device_class=SensorDeviceClass.POWER,
+        )
 
         assert sensor.native_value is None
 
@@ -669,7 +697,12 @@ class TestChargeStatusSensorNativeValue:
         updated_device = _make_device(device_id="device_1", last_status={"chargeStatus": {"chargePower": 500}})
         coordinator = _make_coordinator([updated_device])
         sensor = AndersenEvChargeStatusSensor(
-            coordinator, original_device, "charge_power", "Charge Power", "chargePower"
+            coordinator,
+            original_device,
+            "charge_power",
+            "Charge Power",
+            "chargePower",
+            device_class=SensorDeviceClass.POWER,
         )
 
         assert sensor.native_value == 500

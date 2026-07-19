@@ -372,18 +372,23 @@ class TestSetScheduleEnabled:
         coordinator.async_request_refresh.assert_awaited_once()
 
     @pytest.mark.asyncio
-    async def test_formatted_slots_are_independent_of_source_array(self):
-        original_slots = [{"enabled": False}]
+    async def test_formatted_slots_are_deep_copied_from_source(self):
+        captured = {}
+
+        async def capture_mutation(slots, **_kwargs):
+            captured["slots"] = slots
+            return True
+
+        original_slots = [{"enabled": False, "start": "08:00"}]
         device = _make_device(last_status={"scheduleSlotsArray": original_slots})
         coordinator = _make_coordinator([device])
         switch = _make_switch(coordinator, device, index=0)
-        switch._send_set_schedules_mutation = AsyncMock(return_value=True)
+        switch._send_set_schedules_mutation = AsyncMock(side_effect=capture_mutation)
 
         await switch._set_schedule_enabled(True)
 
-        formatted_slots = switch._send_set_schedules_mutation.call_args.args[0]
-        formatted_slots["sch0"]["enabled"] = False
-        assert original_slots[0]["enabled"] is False
+        captured["slots"]["sch0"]["start"] = "99:99"
+        assert original_slots[0]["start"] == "08:00"
 
 
 class TestSendSetSchedulesMutation:

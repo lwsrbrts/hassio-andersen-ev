@@ -1,12 +1,14 @@
 """Tests for KonnectClient Cognito auth and device-key-aware token refresh."""
 # pylint: disable=protected-access
 
+import time
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from botocore.exceptions import ClientError
 
 from andersen_ev.konnect.client import KonnectClient
+from andersen_ev.konnect.exceptions import AndersenAuthError, AndersenConnectionError
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -257,3 +259,261 @@ class TestRefreshToken:
             mock_boto3.client.return_value = mock_cognito
             with pytest.raises(ClientError):
                 await client.refresh_token()
+
+    @pytest.mark.asyncio
+    async def test_authenticate_user_wraps_exception_in_andersen_auth_error(self):
+        """authenticate_user() wraps any auth failure in AndersenAuthError."""
+        client = KonnectClient("user@example.com", "password")
+
+        with patch("andersen_ev.konnect.client.AWSSRP", side_effect=Exception("bad creds")):
+            with patch.object(
+                client,
+                "_KonnectClient__fetchUsername",
+                new=AsyncMock(return_value="test-username"),
+            ):
+                with pytest.raises(AndersenAuthError):
+                    await client.authenticate_user()
+
+
+# ---------------------------------------------------------------------------
+# _expiry_str()
+# ---------------------------------------------------------------------------
+
+
+class TestExpiryStr:
+    """Tests for the _expiry_str() helper."""
+
+    def test_unknown_when_expiry_not_set(self):
+        """_expiry_str() returns 'unknown' when tokenExpiryTime is not set."""
+        client = KonnectClient("user@example.com", "password")
+        assert client._expiry_str() == "unknown"
+
+    def test_formats_local_time_when_expiry_set(self):
+        """_expiry_str() formats tokenExpiryTime as a local time string."""
+        client = KonnectClient("user@example.com", "password")
+        client.tokenExpiryTime = time.time() + 100
+
+        expected = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(client.tokenExpiryTime))
+        assert client._expiry_str() == expected
+
+
+# ---------------------------------------------------------------------------
+# is_token_valid()
+# ---------------------------------------------------------------------------
+
+
+class TestIsTokenValid:
+    """Tests for is_token_valid()."""
+
+    @pytest.mark.asyncio
+    async def test_no_token_is_invalid(self):
+        """is_token_valid() is False when there is no token."""
+        client = KonnectClient("user@example.com", "password")
+        client.token = None
+        client.tokenExpiryTime = time.time() + 100
+
+        assert await client.is_token_valid() is False
+
+    @pytest.mark.asyncio
+    async def test_no_expiry_time_is_invalid(self):
+        """is_token_valid() is False when tokenExpiryTime is not set."""
+        client = KonnectClient("user@example.com", "password")
+        client.token = "tok"
+        client.tokenExpiryTime = None
+
+        assert await client.is_token_valid() is False
+
+    @pytest.mark.asyncio
+    async def test_expired_token_is_invalid(self):
+        """is_token_valid() is False once tokenExpiryTime has passed."""
+        client = KonnectClient("user@example.com", "password")
+        client.token = "tok"
+        client.tokenExpiryTime = time.time() - 10
+
+        assert await client.is_token_valid() is False
+
+    @pytest.mark.asyncio
+    async def test_valid_token_is_valid(self):
+        """is_token_valid() is True while tokenExpiryTime is in the future."""
+        client = KonnectClient("user@example.com", "password")
+        client.token = "tok"
+        client.tokenExpiryTime = time.time() + 1000
+
+        assert await client.is_token_valid() is True
+
+
+# ---------------------------------------------------------------------------
+# ensure_valid_auth()
+# ---------------------------------------------------------------------------
+
+
+class TestEnsureValidAuth:
+    """Tests for ensure_valid_auth()."""
+
+    @pytest.mark.asyncio
+    async def test_refreshes_when_token_invalid(self):
+        """ensure_valid_auth() refreshes the token when it is not valid."""
+        client = KonnectClient("user@example.com", "password")
+        client.is_token_valid = AsyncMock(return_value=False)
+        client.refresh_token = AsyncMock()
+
+        await client.ensure_valid_auth()
+
+        client.refresh_token.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_skips_refresh_when_token_valid(self):
+        """ensure_valid_auth() does not refresh when the token is already valid."""
+        client = KonnectClient("user@example.com", "password")
+        client.is_token_valid = AsyncMock(return_value=True)
+        client.refresh_token = AsyncMock()
+        client.tokenExpiryTime = time.time() + 1000
+
+        await client.ensure_valid_auth()
+
+        client.refresh_token.assert_not_awaited()
+
+
+# ---------------------------------------------------------------------------
+# getDevices()
+# ---------------------------------------------------------------------------
+
+
+class TestGetDevices:
+    """Tests for getDevices()."""
+
+    @pytest.mark.asyncio
+    async def test_get_devices_success(self):
+        """getDevices() returns KonnectDevice objects built from the response body."""
+        client = KonnectClient("user@example.com", "password")
+        client.ensure_valid_auth = AsyncMock()
+        client.token = "abc"
+
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "devices": [
+                {"id": "dev1", "friendlyName": "My Charger", "userLock": True},
+                {"id": "dev2", "friendlyName": "", "userLock": False},
+            ]
+        }
+
+        with patch("andersen_ev.konnect.client.requests") as mock_requests:
+            mock_requests.get.return_value = mock_response
+            devices = await client.getDevices()
+
+        assert len(devices) == 2
+        assert devices[0].device_id == "dev1"
+        assert devices[0].friendly_name == "My Charger"
+        assert devices[0].user_lock is True
+        # Empty friendlyName falls back to the default "Andersen" name.
+        assert devices[1].friendly_name == "Andersen"
+        client.ensure_valid_auth.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_get_devices_empty_list(self):
+        """getDevices() returns an empty list when the API reports no devices."""
+        client = KonnectClient("user@example.com", "password")
+        client.ensure_valid_auth = AsyncMock()
+        client.token = "abc"
+
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"devices": []}
+
+        with patch("andersen_ev.konnect.client.requests") as mock_requests:
+            mock_requests.get.return_value = mock_response
+            devices = await client.getDevices()
+
+        assert devices == []
+
+    @pytest.mark.asyncio
+    async def test_get_devices_retries_after_401(self):
+        """getDevices() refreshes the token and retries once on a 401."""
+        client = KonnectClient("user@example.com", "password")
+        client.ensure_valid_auth = AsyncMock()
+        client.refresh_token = AsyncMock()
+        client.token = "abc"
+
+        unauthorized_response = MagicMock()
+        unauthorized_response.status_code = 401
+        unauthorized_response.text = "Unauthorized"
+
+        ok_response = MagicMock()
+        ok_response.status_code = 200
+        ok_response.json.return_value = {"devices": []}
+
+        with patch("andersen_ev.konnect.client.requests") as mock_requests:
+            mock_requests.get.side_effect = [unauthorized_response, ok_response]
+            devices = await client.getDevices()
+
+        assert devices == []
+        client.refresh_token.assert_awaited_once()
+        assert mock_requests.get.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_get_devices_non_200_raises_connection_error(self):
+        """getDevices() raises AndersenConnectionError on an unexpected status code."""
+        client = KonnectClient("user@example.com", "password")
+        client.ensure_valid_auth = AsyncMock()
+        client.token = "abc"
+
+        error_response = MagicMock()
+        error_response.status_code = 500
+        error_response.text = "Server error"
+
+        with patch("andersen_ev.konnect.client.requests") as mock_requests:
+            mock_requests.get.return_value = error_response
+            with pytest.raises(AndersenConnectionError):
+                await client.getDevices()
+
+
+# ---------------------------------------------------------------------------
+# __fetchUsername()
+# ---------------------------------------------------------------------------
+
+
+class TestFetchUsername:
+    """Tests for the private __fetchUsername() helper."""
+
+    @pytest.mark.asyncio
+    async def test_non_200_raises_auth_error(self):
+        """A non-200 response raises AndersenAuthError."""
+        client = KonnectClient("user@example.com", "password")
+
+        mock_response = MagicMock()
+        mock_response.status_code = 404
+
+        with patch("andersen_ev.konnect.client.requests") as mock_requests:
+            mock_requests.post.return_value = mock_response
+            with pytest.raises(AndersenAuthError):
+                await client._KonnectClient__fetchUsername()
+
+    @pytest.mark.asyncio
+    async def test_missing_username_raises_auth_error(self):
+        """A 200 response without a 'username' key raises AndersenAuthError."""
+        client = KonnectClient("user@example.com", "password")
+
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"error": 'Pending user with email "x" not found'}
+
+        with patch("andersen_ev.konnect.client.requests") as mock_requests:
+            mock_requests.post.return_value = mock_response
+            with pytest.raises(AndersenAuthError):
+                await client._KonnectClient__fetchUsername()
+
+    @pytest.mark.asyncio
+    async def test_success_returns_username(self):
+        """A 200 response with a 'username' key returns that username."""
+        client = KonnectClient("user@example.com", "password")
+
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"username": "abc-123:1"}
+
+        with patch("andersen_ev.konnect.client.requests") as mock_requests:
+            mock_requests.post.return_value = mock_response
+            username = await client._KonnectClient__fetchUsername()
+
+        assert username == "abc-123:1"

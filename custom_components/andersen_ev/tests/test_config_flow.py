@@ -161,6 +161,112 @@ class TestAsyncStepUser:
         assert result["errors"] == {}
         flow.async_set_unique_id.assert_not_awaited()
 
+    @pytest.mark.asyncio
+    async def test_unexpected_exception_shows_unknown_error(self):
+        """An exception that escapes validate_input's own handling shows the 'unknown' error."""
+        flow = _make_flow()
+        user_input = {CONF_EMAIL: "test@example.com", CONF_PASSWORD: "testpass"}
+
+        with patch("andersen_ev.config_flow.validate_input", AsyncMock(side_effect=Exception("boom"))):
+            result = await flow.async_step_user(user_input)
+
+        assert result["type"] is FlowResultType.FORM
+        assert result["errors"] == {"base": "unknown"}
+        flow.async_set_unique_id.assert_not_awaited()
+        flow.async_create_entry.assert_not_called()
+
+
+def _make_reauth_flow(email="test@example.com", password="oldpass"):
+    """Create a ConfigFlow instance stubbed for reauth-step tests.
+
+    Builds on `_make_flow()` and additionally stubs `_get_reauth_entry` (normally supplied by
+    HA's flow manager for reauth flows) and `async_update_reload_and_abort`.
+    """
+    flow = _make_flow()
+    mock_entry = MagicMock()
+    mock_entry.data = {CONF_EMAIL: email, CONF_PASSWORD: password}
+    flow._get_reauth_entry = MagicMock(return_value=mock_entry)
+    flow.async_update_reload_and_abort = MagicMock(
+        side_effect=lambda entry, **kw: {"type": FlowResultType.ABORT, "reason": "reauth_successful"}
+    )
+    return flow
+
+
+class TestAsyncStepReauth:
+    """Tests for ConfigFlow.async_step_reauth() and async_step_reauth_confirm()."""
+
+    @pytest.mark.asyncio
+    async def test_reauth_delegates_to_confirm_step(self):
+        """async_step_reauth() shows the reauth confirmation form."""
+        flow = _make_reauth_flow()
+
+        result = await flow.async_step_reauth({CONF_EMAIL: "test@example.com"})
+
+        assert result["type"] is FlowResultType.FORM
+        assert result["step_id"] == "reauth_confirm"
+
+    @pytest.mark.asyncio
+    async def test_reauth_confirm_no_input_shows_form_with_email(self):
+        """Calling reauth_confirm with no input shows the form with the stored email."""
+        flow = _make_reauth_flow(email="user@example.com")
+
+        result = await flow.async_step_reauth_confirm(None)
+
+        assert result["type"] is FlowResultType.FORM
+        assert result["step_id"] == "reauth_confirm"
+        assert result["description_placeholders"] == {"email": "user@example.com"}
+        assert result["errors"] == {}
+
+    @pytest.mark.asyncio
+    async def test_reauth_confirm_success_updates_entry(self):
+        """A successful reauth updates the entry password and aborts with reauth_successful."""
+        flow = _make_reauth_flow(email="test@example.com", password="oldpass")
+
+        with _patch_konnect_client():
+            result = await flow.async_step_reauth_confirm({CONF_PASSWORD: "newpass"})
+
+        assert result["type"] is FlowResultType.ABORT
+        assert result["reason"] == "reauth_successful"
+        flow.async_update_reload_and_abort.assert_called_once()
+        _, kwargs = flow.async_update_reload_and_abort.call_args
+        assert kwargs["data_updates"] == {CONF_PASSWORD: "newpass"}
+
+    @pytest.mark.asyncio
+    async def test_reauth_confirm_invalid_auth_shows_error(self):
+        """An AndersenAuthError during reauth re-shows the form with invalid_auth."""
+        flow = _make_reauth_flow()
+
+        with _patch_konnect_client(auth_error=AndersenAuthError("bad password")):
+            result = await flow.async_step_reauth_confirm({CONF_PASSWORD: "wrong"})
+
+        assert result["type"] is FlowResultType.FORM
+        assert result["errors"] == {"base": "invalid_auth"}
+        flow.async_update_reload_and_abort.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_reauth_confirm_cannot_connect_shows_error(self):
+        """An AndersenConnectionError during reauth re-shows the form with cannot_connect."""
+        flow = _make_reauth_flow()
+
+        with _patch_konnect_client(auth_error=AndersenConnectionError("network down")):
+            result = await flow.async_step_reauth_confirm({CONF_PASSWORD: "newpass"})
+
+        assert result["type"] is FlowResultType.FORM
+        assert result["errors"] == {"base": "cannot_connect"}
+        flow.async_update_reload_and_abort.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_reauth_confirm_unknown_error_shows_error(self):
+        """An unexpected exception during reauth re-shows the form with unknown."""
+        flow = _make_reauth_flow()
+
+        with patch("andersen_ev.config_flow.validate_input", AsyncMock(side_effect=Exception("boom"))):
+            result = await flow.async_step_reauth_confirm({CONF_PASSWORD: "newpass"})
+
+        assert result["type"] is FlowResultType.FORM
+        assert result["errors"] == {"base": "unknown"}
+        flow.async_update_reload_and_abort.assert_not_called()
+
 
 class TestManifest:
     """Tests for the manifest.json declarations this feature relies on."""

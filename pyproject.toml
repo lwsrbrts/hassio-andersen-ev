@@ -2,6 +2,16 @@
 pythonpath = ["custom_components"]
 asyncio_mode = "auto"
 
+[tool.coverage.run]
+omit = [
+    "custom_components/andersen_ev/tests/*",
+]
+
+[tool.coverage.report]
+omit = [
+    "custom_components/andersen_ev/tests/*",
+]
+
 [tool.mypy]
 python_version = "3.13"
 ignore_missing_imports = true

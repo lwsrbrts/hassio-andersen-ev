@@ -224,3 +224,160 @@ class TestDeviceGraphQLCalls:
 
         result = await mock_device.set_solar(override=True)
         assert result is False
+
+    # -- misc / lifecycle tests ---------------------------------------------
+
+    def test_last_status_property(self, mock_device):
+        """Test that last_status exposes the private _last_status field."""
+        assert mock_device.last_status is None
+
+        mock_device._last_status = {"evseState": "3"}
+        assert mock_device.last_status == {"evseState": "3"}
+
+    @pytest.mark.asyncio
+    async def test_refresh_graphql_token(self, mock_device, mock_api):
+        """Test _refresh_graphql_token refreshes the API client and returns its token/expiry."""
+        mock_api.token = "new-token"
+        mock_api.tokenExpiryTime = 12345
+        mock_api.refresh_token = AsyncMock()
+
+        token, expiry = await mock_device._refresh_graphql_token()
+
+        mock_api.refresh_token.assert_awaited_once()
+        assert token == "new-token"
+        assert expiry == 12345
+
+    @pytest.mark.asyncio
+    async def test_close_noop_when_graphql_client_not_created(self, mock_device):
+        """Test close() is a no-op if the GraphQL client was never lazily created."""
+        assert mock_device._graphql_client is None
+        await mock_device.close()  # should not raise
+        assert mock_device._graphql_client is None
+
+    @pytest.mark.asyncio
+    async def test_close_closes_graphql_client(self, mock_device):
+        """Test close() delegates to the GraphQL client's close() once created."""
+        mock_device.graphql_client
+        mock_device._graphql_client.close = AsyncMock()
+
+        await mock_device.close()
+
+        mock_device._graphql_client.close.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_reset_rcm_success(self, mock_device, graphql_command_success_response):
+        """Test reset_rcm returns True on success."""
+        mock_device.graphql_client.execute_mutation = AsyncMock(return_value=graphql_command_success_response)
+
+        result = await mock_device.reset_rcm()
+
+        assert result is True
+
+    @pytest.mark.asyncio
+    async def test_reset_rcm_failure(self, mock_device):
+        """Test reset_rcm returns False when the mutation fails."""
+        mock_device.graphql_client.execute_mutation = AsyncMock(return_value=None)
+
+        result = await mock_device.reset_rcm()
+
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_enable_failure_leaves_user_lock_unchanged(self, mock_device):
+        """Test enable() does not flip user_lock when the mutation fails."""
+        mock_device.user_lock = False
+        mock_device.graphql_client.execute_mutation = AsyncMock(return_value=None)
+
+        result = await mock_device.enable()
+
+        assert result is False
+        assert mock_device.user_lock is False
+
+    @pytest.mark.asyncio
+    async def test_disable_failure_leaves_user_lock_unchanged(self, mock_device):
+        """Test disable() does not flip user_lock when the mutation fails."""
+        mock_device.user_lock = True
+        mock_device.graphql_client.execute_mutation = AsyncMock(return_value=None)
+
+        result = await mock_device.disable()
+
+        assert result is False
+        assert mock_device.user_lock is True
+
+    # -- status change logging ----------------------------------------------
+
+    @pytest.mark.asyncio
+    async def test_log_status_changes_detects_evse_and_online_changes(self, mock_device, caplog):
+        """Test _log_status_changes logs when evseState or online flips between polls."""
+        first_status = {"evseState": "1", "online": True}
+        second_status = {"evseState": "3", "online": False}
+
+        mock_device.graphql_client.execute_query = AsyncMock(
+            side_effect=[
+                {"getDevice": {"deviceStatus": first_status}},
+                {"getDevice": {"deviceStatus": second_status}},
+            ]
+        )
+
+        await mock_device.get_detailed_device_status()
+        with caplog.at_level("INFO"):
+            await mock_device.get_detailed_device_status()
+
+        assert "EVSE state changed from 1 to 3" in caplog.text
+        assert "Online state changed from True to False" in caplog.text
+
+    @pytest.mark.asyncio
+    async def test_log_status_changes_no_change_does_not_log(self, mock_device, caplog):
+        """Test _log_status_changes stays quiet when nothing tracked has changed."""
+        status = {"evseState": "1", "online": True}
+
+        mock_device.graphql_client.execute_query = AsyncMock(
+            side_effect=[
+                {"getDevice": {"deviceStatus": dict(status)}},
+                {"getDevice": {"deviceStatus": dict(status)}},
+            ]
+        )
+
+        await mock_device.get_detailed_device_status()
+        with caplog.at_level("INFO"):
+            await mock_device.get_detailed_device_status()
+
+        assert "EVSE state changed" not in caplog.text
+        assert "Online state changed" not in caplog.text
+
+    # -- get_last_charge() error branches ------------------------------------
+
+    @pytest.mark.asyncio
+    async def test_get_last_charge_graphql_error(self, mock_device):
+        """Test get_last_charge returns None when the GraphQL call itself fails."""
+        mock_device.graphql_client.execute_query = AsyncMock(return_value=None)
+
+        result = await mock_device.get_last_charge()
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_get_last_charge_invalid_response_format(self, mock_device):
+        """Test get_last_charge returns None when the response is missing expected keys."""
+        invalid_response = {"unexpected": "shape"}
+        mock_device.graphql_client.execute_query = AsyncMock(return_value=invalid_response)
+
+        result = await mock_device.get_last_charge()
+        assert result is None
+
+    # -- get_device_info() error branches ------------------------------------
+
+    @pytest.mark.asyncio
+    async def test_get_device_info_graphql_error(self, mock_device):
+        """Test get_device_info returns None when the GraphQL call itself fails."""
+        mock_device.graphql_client.execute_query = AsyncMock(return_value=None)
+
+        result = await mock_device.get_device_info()
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_get_device_info_invalid_response_format(self, mock_device):
+        """Test get_device_info returns None when the response is missing 'getDevice'."""
+        mock_device.graphql_client.execute_query = AsyncMock(return_value={"unexpected": "shape"})
+
+        result = await mock_device.get_device_info()
+        assert result is None

@@ -28,6 +28,7 @@ class KonnectDevice:
         self._last_status = None
         self.model_name = None
         self._graphql_client = None
+        self.status_available = True
 
     @property
     def last_status(self):

@@ -75,7 +75,7 @@ class AndersenEvLock(CoordinatorEntity, LockEntity):  # pylint: disable=abstract
                 self._device = device
                 # Try to update model info if we have device status
                 self._update_model_from_device_status()
-                return True
+                return self.coordinator.last_update_success and self._device.status_available
 
         # Device no longer exists
         return False

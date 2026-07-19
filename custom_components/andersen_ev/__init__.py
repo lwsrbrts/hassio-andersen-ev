@@ -8,6 +8,7 @@ import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, ServiceCall
+from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import (
@@ -20,7 +21,7 @@ from .const import (
     SERVICE_RCM_RESET,
 )
 from .konnect.client import KonnectClient
-from .konnect.exceptions import AndersenError
+from .konnect.exceptions import AndersenAuthError, AndersenError
 
 PLATFORMS = [Platform.LOCK, Platform.SENSOR, Platform.SWITCH]
 
@@ -153,6 +154,8 @@ class AndersenEvCoordinator(DataUpdateCoordinator):
         """Fetch data from API endpoint."""
         try:
             devices = await self.client.getDevices()
+        except AndersenAuthError as err:
+            raise ConfigEntryAuthFailed("Authentication failed - please re-enter credentials") from err
         except AndersenError as err:
             if self.devices:
                 _LOGGER.warning("API error, using cached device data: %s", err)

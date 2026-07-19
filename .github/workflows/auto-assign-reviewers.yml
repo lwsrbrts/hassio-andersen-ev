@@ -1,0 +1,128 @@
+name: Auto-assign reviewers
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+  schedule:
+    - cron: "0 9 * * *"
+
+jobs:
+  dependabot-assign:
+    if: github.event_name == 'pull_request' && github.actor == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Add codeowners as reviewers
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const codeowners = ['lwsrbrts', 'toby200', 'michaeln31'];
+            const author = context.payload.pull_request.user.login;
+            const reviewers = codeowners.filter(r => r !== author);
+            if (reviewers.length > 0) {
+              await github.rest.pulls.requestReviewers({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: context.payload.pull_request.number,
+                reviewers,
+              });
+            }
+
+  release-please-assign:
+    if: >-
+      github.event_name == 'pull_request'
+      && contains(github.event.pull_request.labels.*.name, 'autorelease: pending')
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Tag codeowners who contributed to this release
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const codeowners = ['lwsrbrts', 'toby200', 'michaeln31'];
+            const pr = context.payload.pull_request;
+
+            const commits = await github.paginate(github.rest.pulls.listCommits, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: pr.number,
+            });
+
+            const commitAuthors = new Set(
+              commits
+                .map(c => c.author?.login)
+                .filter(Boolean)
+            );
+
+            const reviewers = codeowners.filter(
+              r => commitAuthors.has(r) && r !== pr.user.login
+            );
+
+            if (reviewers.length > 0) {
+              await github.rest.pulls.requestReviewers({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: pr.number,
+                reviewers,
+              });
+              console.log(`Added contributors ${reviewers.join(', ')} to release PR #${pr.number}`);
+            }
+
+  stale-pr-assign:
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Add codeowners to PRs open longer than 3 days
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const codeowners = ['lwsrbrts', 'toby200', 'michaeln31'];
+            const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
+
+            const { data: pulls } = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              sort: 'created',
+              direction: 'asc',
+            });
+
+            for (const pr of pulls) {
+              if (new Date(pr.created_at) > threeDaysAgo) continue;
+
+              const labels = pr.labels.map(l => l.name);
+              if (labels.includes('autorelease: pending')) continue;
+
+              const { data: reviews } = await github.rest.pulls.listReviews({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: pr.number,
+              });
+
+              const { data: reviewRequests } = await github.rest.pulls.listRequestedReviewers({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: pr.number,
+              });
+
+              const alreadyInvolved = new Set([
+                ...reviews.map(r => r.user.login),
+                ...reviewRequests.users.map(u => u.login),
+                pr.user.login,
+              ]);
+
+              const needed = codeowners.filter(r => !alreadyInvolved.has(r));
+              if (needed.length > 0) {
+                await github.rest.pulls.requestReviewers({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  pull_number: pr.number,
+                  reviewers: needed,
+                });
+                console.log(`Added reviewers ${needed.join(', ')} to PR #${pr.number}`);
+              }
+            }

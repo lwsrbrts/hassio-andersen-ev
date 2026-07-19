@@ -36,6 +36,17 @@ feat: add sensor for charger fault code
 These commit types drive automated version bumps and changelog generation, so please use them
 accurately.
 
+## Code review
+
+Reviewers are assigned automatically by a workflow rather than CODEOWNERS:
+
+* **Dependabot PRs** — all maintainers are tagged immediately.
+* **Release-please PRs** — only maintainers who authored commits in the release are tagged.
+* **All other PRs** — if no review activity after 3 days, maintainers are added automatically.
+
+There is no required approval gate, so maintainers can self-merge once CI passes when timely review
+isn't available.
+
 ## Local development
 
 See the README's [Development](README.md#development) section for full details. In short:

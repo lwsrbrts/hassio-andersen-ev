@@ -7,6 +7,7 @@ from typing import Any
 
 from homeassistant.components.lock import LockEntity
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -109,12 +110,14 @@ class AndersenEvLock(CoordinatorEntity, LockEntity):  # pylint: disable=abstract
 
     async def async_lock(self, **kwargs: Any) -> None:
         """Lock the charging station (disable charging)."""
-        await self._device.disable()
+        if not await self._device.disable():
+            raise HomeAssistantError("Failed to lock the charger")
         _LOGGER.debug("Locking device %s (disabling charging)", self._device.friendly_name)
         await self.coordinator.async_request_refresh()
 
     async def async_unlock(self, **kwargs: Any) -> None:
         """Unlock the charging station (enable charging)."""
-        await self._device.enable()
+        if not await self._device.enable():
+            raise HomeAssistantError("Failed to unlock the charger")
         _LOGGER.debug("Unlocking device %s (enabling charging)", self._device.friendly_name)
         await self.coordinator.async_request_refresh()

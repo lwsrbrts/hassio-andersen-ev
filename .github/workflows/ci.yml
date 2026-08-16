@@ -33,15 +33,9 @@ jobs:
   test:
     name: Test (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
-    # litellm ships a Rust/PyO3 native build (pulled transitively via
-    # homeassistant -> hass-nabucasa) whose PyO3 has no Python 3.14 support yet,
-    # so the 3.14 install fails at the native build. Build against the stable ABI
-    # instead. Remove once litellm publishes 3.14-compatible wheels.
-    env:
-      PYO3_USE_ABI3_FORWARD_COMPATIBILITY: "1"
     strategy:
       matrix:
-        python-version: ["3.13", "3.14"]
+        python-version: ["3.14"]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Set up uv
@@ -81,7 +75,7 @@ jobs:
       - name: Set up uv
         uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
         with:
-          python-version: "3.13"
+          python-version: "3.14"
           enable-cache: true
       - name: Create venv
         run: uv venv

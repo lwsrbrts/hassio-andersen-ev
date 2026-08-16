@@ -39,7 +39,7 @@ rules:
 
   # Gold
   devices: todo
-  diagnostics: todo
+  diagnostics: done
   discovery:
     status: exempt
     comment: Cloud-only integration; no local/network discovery.

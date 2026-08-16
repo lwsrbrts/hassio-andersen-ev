@@ -18,11 +18,13 @@ from homeassistant.const import (
     UnitOfTemperature,
 )
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import AndersenEvConfigEntry, AndersenEvCoordinator
 from .const import DOMAIN
+from .entity import AndersenEvDeviceInfoMixin
 
 PARALLEL_UPDATES = 0
 
@@ -36,277 +38,296 @@ async def async_setup_entry(
 ) -> None:
     """Set up the Andersen EV sensor platform."""
     coordinator = entry.runtime_data
+    known_device_ids: set[str] = set()
 
-    entities = []
-    for device in coordinator.data:
-        # Energy sensors from historical data
-        entities.append(
-            AndersenEvEnergySensor(
-                coordinator,
-                device,
-                "energy",
-                "Total Energy",
-                "chargeEnergyTotal",
-                "mdi:lightning-bolt-circle",
-            )
-        )
-        entities.append(
-            AndersenEvEnergySensor(
-                coordinator,
-                device,
-                "grid_energy",
-                "Grid Energy",
-                "gridEnergyTotal",
-                "mdi:transmission-tower",
-            )
-        )
-        entities.append(
-            AndersenEvEnergySensor(
-                coordinator,
-                device,
-                "solar_energy",
-                "Solar Energy",
-                "solarEnergyTotal",
-                "mdi:solar-power",
-            )
-        )
-        entities.append(
-            AndersenEvEnergySensor(
-                coordinator,
-                device,
-                "surplus_energy",
-                "Surplus Energy",
-                "surplusUsedEnergyTotal",
-                "mdi:battery-plus",
-            )
-        )
+    def _entities_for_new_devices() -> list[SensorEntity]:
+        """Build sensor entities for any device not seen before."""
+        new_devices = [device for device in coordinator.data if device.device_id not in known_device_ids]
+        entities: list[SensorEntity] = []
+        for device in new_devices:
+            known_device_ids.add(device.device_id)
+            entities.extend(_build_entities_for_device(coordinator, device))
+        return entities
 
-        # Live status sensors
-        entities.append(
-            AndersenEvLiveSensor(
-                coordinator,
-                device,
-                "sys_grid_power",
-                "System Grid Power",
-                "sysGridPower",
-                SensorDeviceClass.POWER,
-                SensorStateClass.MEASUREMENT,
-                UnitOfPower.KILO_WATT,
-                "mdi:transmission-tower",
-            )
-        )
-        entities.append(
-            AndersenEvLiveSensor(
-                coordinator,
-                device,
-                "sys_temperature",
-                "System Temperature",
-                "sysTemperature",
-                SensorDeviceClass.TEMPERATURE,
-                SensorStateClass.MEASUREMENT,
-                UnitOfTemperature.CELSIUS,
-                "mdi:temperature-celsius",
-            )
-        )
-        entities.append(
-            AndersenEvLiveSensor(
-                coordinator,
-                device,
-                "sys_voltage",
-                "System Voltage",
-                "sysVoltageC",
-                SensorDeviceClass.VOLTAGE,
-                SensorStateClass.MEASUREMENT,
-                UnitOfElectricPotential.VOLT,
-                "mdi:transmission-tower",
-            )
-        )
-        entities.append(
-            AndersenEvLiveSensor(
-                coordinator,
-                device,
-                "sys_fault_code",
-                "Fault Code",
-                "sysFaultCode",
-                None,
-                None,
-                None,
-                "mdi:exclamation",
-            )
-        )
-        entities.append(
-            AndersenEvLiveSensor(
-                coordinator,
-                device,
-                "sys_grid_energy_delta",
-                "System Grid Energy Delta",
-                "sysGridEnergyDelta",
-                SensorDeviceClass.ENERGY,
-                SensorStateClass.TOTAL,
-                UnitOfEnergy.KILO_WATT_HOUR,
-                "mdi:transmission-tower",
-            )
-        )
+    def _handle_coordinator_update() -> None:
+        if new_entities := _entities_for_new_devices():
+            async_add_entities(new_entities)
 
-        # Cost sensors from historical data
-        entities.append(
-            AndersenEvCostSensor(
-                coordinator,
-                device,
-                "cost",
-                "Total Cost",
-                "chargeCostTotal",
-                "mdi:currency-gbp",
-            )
-        )
-        entities.append(
-            AndersenEvCostSensor(
-                coordinator,
-                device,
-                "grid_cost",
-                "Grid Cost",
-                "gridCostTotal",
-                "mdi:cash-multiple",
-            )
-        )
-        entities.append(
-            AndersenEvCostSensor(
-                coordinator,
-                device,
-                "solar_cost",
-                "Solar Cost",
-                "solarCostTotal",
-                "mdi:solar-power-variant",
-            )
-        )
-        entities.append(
-            AndersenEvCostSensor(
-                coordinator,
-                device,
-                "surplus_cost",
-                "Surplus Cost",
-                "surplusUsedCostTotal",
-                "mdi:cash-plus",
-            )
-        )
-
-        # Connector state sensor
-        entities.append(AndersenEvConnectorSensor(coordinator, device))
-
-        # Realtime charge status sensors - power
-        entities.append(
-            AndersenEvChargeStatusSensor(
-                coordinator,
-                device,
-                "charge_power",
-                "Charge Power",
-                "chargePower",
-                SensorDeviceClass.POWER,
-                SensorStateClass.MEASUREMENT,
-                UnitOfPower.WATT,
-                "mdi:ev-station",
-            )
-        )
-        entities.append(
-            AndersenEvChargeStatusSensor(
-                coordinator,
-                device,
-                "charge_power_max",
-                "Max Charge Power",
-                "chargePowerMax",
-                SensorDeviceClass.POWER,
-                SensorStateClass.MEASUREMENT,
-                UnitOfPower.KILO_WATT,
-                "mdi:speedometer",
-            )
-        )
-        entities.append(
-            AndersenEvChargeStatusSensor(
-                coordinator,
-                device,
-                "solar_power",
-                "Solar Power",
-                "solarPower",
-                SensorDeviceClass.POWER,
-                SensorStateClass.MEASUREMENT,
-                UnitOfPower.WATT,
-                "mdi:solar-power",
-            )
-        )
-        entities.append(
-            AndersenEvChargeStatusSensor(
-                coordinator,
-                device,
-                "grid_power",
-                "Grid Power",
-                "gridPower",
-                SensorDeviceClass.POWER,
-                SensorStateClass.MEASUREMENT,
-                UnitOfPower.WATT,
-                "mdi:transmission-tower",
-            )
-        )
-
-        # Realtime charge status sensors - energy
-        entities.append(
-            AndersenEvChargeStatusSensor(
-                coordinator,
-                device,
-                "current_charge_energy",
-                "Current Session Energy",
-                "chargeEnergyTotal",
-                SensorDeviceClass.ENERGY,
-                SensorStateClass.TOTAL,
-                UnitOfEnergy.KILO_WATT_HOUR,
-                "mdi:car-electric",
-            )
-        )
-        entities.append(
-            AndersenEvChargeStatusSensor(
-                coordinator,
-                device,
-                "current_solar_energy",
-                "Current Session Solar Energy",
-                "solarEnergyTotal",
-                SensorDeviceClass.ENERGY,
-                SensorStateClass.TOTAL,
-                UnitOfEnergy.KILO_WATT_HOUR,
-                "mdi:solar-power-variant",
-            )
-        )
-        entities.append(
-            AndersenEvChargeStatusSensor(
-                coordinator,
-                device,
-                "current_grid_energy",
-                "Current Session Grid Energy",
-                "gridEnergyTotal",
-                SensorDeviceClass.ENERGY,
-                SensorStateClass.TOTAL,
-                UnitOfEnergy.KILO_WATT_HOUR,
-                "mdi:power-plug",
-            )
-        )
-
-        # Start time sensor
-        entities.append(
-            AndersenEvChargeStatusSensor(
-                coordinator,
-                device,
-                "session_start",
-                "Session Start Time",
-                "start",
-                SensorDeviceClass.TIMESTAMP,
-                None,
-                None,
-                "mdi:clock-start",
-            )
-        )
-
-    async_add_entities(entities)
+    async_add_entities(_entities_for_new_devices())
+    entry.async_on_unload(coordinator.async_add_listener(_handle_coordinator_update))
 
 
-class AndersenEvBaseSensor(CoordinatorEntity, SensorEntity):
+def _build_entities_for_device(coordinator: AndersenEvCoordinator, device) -> list[SensorEntity]:
+    """Build all sensor entities for a single device."""
+    entities: list[SensorEntity] = []
+    # Energy sensors from historical data
+    entities.append(
+        AndersenEvEnergySensor(
+            coordinator,
+            device,
+            "energy",
+            "Total Energy",
+            "chargeEnergyTotal",
+            "mdi:lightning-bolt-circle",
+        )
+    )
+    entities.append(
+        AndersenEvEnergySensor(
+            coordinator,
+            device,
+            "grid_energy",
+            "Grid Energy",
+            "gridEnergyTotal",
+            "mdi:transmission-tower",
+        )
+    )
+    entities.append(
+        AndersenEvEnergySensor(
+            coordinator,
+            device,
+            "solar_energy",
+            "Solar Energy",
+            "solarEnergyTotal",
+            "mdi:solar-power",
+        )
+    )
+    entities.append(
+        AndersenEvEnergySensor(
+            coordinator,
+            device,
+            "surplus_energy",
+            "Surplus Energy",
+            "surplusUsedEnergyTotal",
+            "mdi:battery-plus",
+        )
+    )
+
+    # Live status sensors
+    entities.append(
+        AndersenEvLiveSensor(
+            coordinator,
+            device,
+            "sys_grid_power",
+            "System Grid Power",
+            "sysGridPower",
+            SensorDeviceClass.POWER,
+            SensorStateClass.MEASUREMENT,
+            UnitOfPower.KILO_WATT,
+            "mdi:transmission-tower",
+        )
+    )
+    entities.append(
+        AndersenEvLiveSensor(
+            coordinator,
+            device,
+            "sys_temperature",
+            "System Temperature",
+            "sysTemperature",
+            SensorDeviceClass.TEMPERATURE,
+            SensorStateClass.MEASUREMENT,
+            UnitOfTemperature.CELSIUS,
+            "mdi:temperature-celsius",
+        )
+    )
+    entities.append(
+        AndersenEvLiveSensor(
+            coordinator,
+            device,
+            "sys_voltage",
+            "System Voltage",
+            "sysVoltageC",
+            SensorDeviceClass.VOLTAGE,
+            SensorStateClass.MEASUREMENT,
+            UnitOfElectricPotential.VOLT,
+            "mdi:transmission-tower",
+        )
+    )
+    entities.append(
+        AndersenEvLiveSensor(
+            coordinator,
+            device,
+            "sys_fault_code",
+            "Fault Code",
+            "sysFaultCode",
+            None,
+            None,
+            None,
+            "mdi:exclamation",
+        )
+    )
+    entities.append(
+        AndersenEvLiveSensor(
+            coordinator,
+            device,
+            "sys_grid_energy_delta",
+            "System Grid Energy Delta",
+            "sysGridEnergyDelta",
+            SensorDeviceClass.ENERGY,
+            SensorStateClass.TOTAL,
+            UnitOfEnergy.KILO_WATT_HOUR,
+            "mdi:transmission-tower",
+        )
+    )
+
+    # Cost sensors from historical data
+    entities.append(
+        AndersenEvCostSensor(
+            coordinator,
+            device,
+            "cost",
+            "Total Cost",
+            "chargeCostTotal",
+            "mdi:currency-gbp",
+        )
+    )
+    entities.append(
+        AndersenEvCostSensor(
+            coordinator,
+            device,
+            "grid_cost",
+            "Grid Cost",
+            "gridCostTotal",
+            "mdi:cash-multiple",
+        )
+    )
+    entities.append(
+        AndersenEvCostSensor(
+            coordinator,
+            device,
+            "solar_cost",
+            "Solar Cost",
+            "solarCostTotal",
+            "mdi:solar-power-variant",
+        )
+    )
+    entities.append(
+        AndersenEvCostSensor(
+            coordinator,
+            device,
+            "surplus_cost",
+            "Surplus Cost",
+            "surplusUsedCostTotal",
+            "mdi:cash-plus",
+        )
+    )
+
+    # Connector state sensor
+    entities.append(AndersenEvConnectorSensor(coordinator, device))
+
+    # Realtime charge status sensors - power
+    entities.append(
+        AndersenEvChargeStatusSensor(
+            coordinator,
+            device,
+            "charge_power",
+            "Charge Power",
+            "chargePower",
+            SensorDeviceClass.POWER,
+            SensorStateClass.MEASUREMENT,
+            UnitOfPower.WATT,
+            "mdi:ev-station",
+        )
+    )
+    entities.append(
+        AndersenEvChargeStatusSensor(
+            coordinator,
+            device,
+            "charge_power_max",
+            "Max Charge Power",
+            "chargePowerMax",
+            SensorDeviceClass.POWER,
+            SensorStateClass.MEASUREMENT,
+            UnitOfPower.KILO_WATT,
+            "mdi:speedometer",
+        )
+    )
+    entities.append(
+        AndersenEvChargeStatusSensor(
+            coordinator,
+            device,
+            "solar_power",
+            "Solar Power",
+            "solarPower",
+            SensorDeviceClass.POWER,
+            SensorStateClass.MEASUREMENT,
+            UnitOfPower.WATT,
+            "mdi:solar-power",
+        )
+    )
+    entities.append(
+        AndersenEvChargeStatusSensor(
+            coordinator,
+            device,
+            "grid_power",
+            "Grid Power",
+            "gridPower",
+            SensorDeviceClass.POWER,
+            SensorStateClass.MEASUREMENT,
+            UnitOfPower.WATT,
+            "mdi:transmission-tower",
+        )
+    )
+
+    # Realtime charge status sensors - energy
+    entities.append(
+        AndersenEvChargeStatusSensor(
+            coordinator,
+            device,
+            "current_charge_energy",
+            "Current Session Energy",
+            "chargeEnergyTotal",
+            SensorDeviceClass.ENERGY,
+            SensorStateClass.TOTAL,
+            UnitOfEnergy.KILO_WATT_HOUR,
+            "mdi:car-electric",
+        )
+    )
+    entities.append(
+        AndersenEvChargeStatusSensor(
+            coordinator,
+            device,
+            "current_solar_energy",
+            "Current Session Solar Energy",
+            "solarEnergyTotal",
+            SensorDeviceClass.ENERGY,
+            SensorStateClass.TOTAL,
+            UnitOfEnergy.KILO_WATT_HOUR,
+            "mdi:solar-power-variant",
+        )
+    )
+    entities.append(
+        AndersenEvChargeStatusSensor(
+            coordinator,
+            device,
+            "current_grid_energy",
+            "Current Session Grid Energy",
+            "gridEnergyTotal",
+            SensorDeviceClass.ENERGY,
+            SensorStateClass.TOTAL,
+            UnitOfEnergy.KILO_WATT_HOUR,
+            "mdi:power-plug",
+        )
+    )
+
+    # Start time sensor
+    entities.append(
+        AndersenEvChargeStatusSensor(
+            coordinator,
+            device,
+            "session_start",
+            "Session Start Time",
+            "start",
+            SensorDeviceClass.TIMESTAMP,
+            None,
+            None,
+            "mdi:clock-start",
+        )
+    )
+
+    return entities
+
+
+class AndersenEvBaseSensor(AndersenEvDeviceInfoMixin, CoordinatorEntity, SensorEntity):
     """Base class for Andersen EV sensors."""
 
     _attr_has_entity_name = True
@@ -319,12 +340,13 @@ class AndersenEvBaseSensor(CoordinatorEntity, SensorEntity):
         self._data_key = data_key
         self._attr_name = name_suffix
         self._attr_unique_id = f"{device.device_id}_{sensor_type}"
-        self._attr_device_info = {
-            "identifiers": {(DOMAIN, device.device_id)},
-            "name": f"{device.friendly_name} ({device.device_id})",
-            "manufacturer": "Andersen EV",
-            "model": "A2",
-        }
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, device.device_id)},
+            name=f"{device.friendly_name} ({device.device_id})",
+            manufacturer="Andersen EV",
+            model="A2",
+            serial_number=f"{device.device_id}",
+        )
         self._last_charge = None
         self._update_model_from_device_status()
 
@@ -333,21 +355,6 @@ class AndersenEvBaseSensor(CoordinatorEntity, SensorEntity):
         await super().async_added_to_hass()
         # Update last charge data
         await self._update_last_charge()
-
-    def _update_model_from_device_status(self):
-        """Update model information from device status if available."""
-        # First try to use the model name from the API if available
-        if hasattr(self._device, "model_name") and self._device.model_name:
-            self._attr_device_info["model"] = self._device.model_name
-        # Fall back to the information from device status
-        elif self._device.last_status:
-            status = self._device.last_status
-            if "sysProductName" in status:
-                self._attr_device_info["model"] = status["sysProductName"]
-            elif "sysProductId" in status:
-                self._attr_device_info["model"] = status["sysProductId"]
-            elif "sysHwVersion" in status:
-                self._attr_device_info["model"] = f"A2 (HW: {status['sysHwVersion']})"
 
     async def _update_last_charge(self):
         """Get the last charge data for the device."""
@@ -419,7 +426,7 @@ class AndersenEvCostSensor(AndersenEvBaseSensor):
         return None
 
 
-class AndersenEvConnectorSensor(CoordinatorEntity, SensorEntity):
+class AndersenEvConnectorSensor(AndersenEvDeviceInfoMixin, CoordinatorEntity, SensorEntity):
     """Sensor for Andersen EV connector state."""
 
     _attr_device_class = SensorDeviceClass.ENUM
@@ -441,12 +448,13 @@ class AndersenEvConnectorSensor(CoordinatorEntity, SensorEntity):
         self._device = device
         self._attr_name = "Connector"
         self._attr_unique_id = f"{device.device_id}_connector"
-        self._attr_device_info = {
-            "identifiers": {(DOMAIN, device.device_id)},
-            "name": f"{device.friendly_name} ({device.device_id})",
-            "manufacturer": "Andersen EV",
-            "model": "A2",
-        }
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, device.device_id)},
+            name=f"{device.friendly_name} ({device.device_id})",
+            manufacturer="Andersen EV",
+            model="A2",
+            serial_number=f"{device.device_id}",
+        )
         if icon:
             self._attr_icon = icon
         else:
@@ -454,21 +462,6 @@ class AndersenEvConnectorSensor(CoordinatorEntity, SensorEntity):
         self._update_model_from_device_status()
         self._connector_state = "unknown"
         self._last_evse_state = None
-
-    def _update_model_from_device_status(self):
-        """Update model information from device status if available."""
-        # First try to use the model name from the API if available
-        if hasattr(self._device, "model_name") and self._device.model_name:
-            self._attr_device_info["model"] = self._device.model_name
-        # Fall back to the information from device status
-        elif self._device.last_status:
-            status = self._device.last_status
-            if "sysProductName" in status:
-                self._attr_device_info["model"] = status["sysProductName"]
-            elif "sysProductId" in status:
-                self._attr_device_info["model"] = status["sysProductId"]
-            elif "sysHwVersion" in status:
-                self._attr_device_info["model"] = f"A2 (HW: {status['sysHwVersion']})"
 
     @property
     def available(self) -> bool:
@@ -548,7 +541,7 @@ class AndersenEvConnectorSensor(CoordinatorEntity, SensorEntity):
             _LOGGER.debug("Error updating connector state: %s", err)
 
 
-class AndersenEvChargeStatusSensor(CoordinatorEntity, SensorEntity):
+class AndersenEvChargeStatusSensor(AndersenEvDeviceInfoMixin, CoordinatorEntity, SensorEntity):
     """Sensor for Andersen EV charge status values."""
 
     _attr_has_entity_name = True
@@ -572,12 +565,13 @@ class AndersenEvChargeStatusSensor(CoordinatorEntity, SensorEntity):
         self._data_key = data_key
         self._attr_name = name_suffix
         self._attr_unique_id = f"{device.device_id}_{sensor_type}"
-        self._attr_device_info = {
-            "identifiers": {(DOMAIN, device.device_id)},
-            "name": f"{device.friendly_name} ({device.device_id})",
-            "manufacturer": "Andersen EV",
-            "model": "A2",
-        }
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, device.device_id)},
+            name=f"{device.friendly_name} ({device.device_id})",
+            manufacturer="Andersen EV",
+            model="A2",
+            serial_number=f"{device.device_id}",
+        )
         if device_class:
             self._attr_device_class = device_class
         if state_class:
@@ -587,21 +581,6 @@ class AndersenEvChargeStatusSensor(CoordinatorEntity, SensorEntity):
         if icon:
             self._attr_icon = icon
         self._update_model_from_device_status()
-
-    def _update_model_from_device_status(self):
-        """Update model information from device status if available."""
-        # First try to use the model name from the API if available
-        if hasattr(self._device, "model_name") and self._device.model_name:
-            self._attr_device_info["model"] = self._device.model_name
-        # Fall back to the information from device status
-        elif self._device.last_status:
-            status = self._device.last_status
-            if "sysProductName" in status:
-                self._attr_device_info["model"] = status["sysProductName"]
-            elif "sysProductId" in status:
-                self._attr_device_info["model"] = status["sysProductId"]
-            elif "sysHwVersion" in status:
-                self._attr_device_info["model"] = f"A2 (HW: {status['sysHwVersion']})"
 
     @property
     def available(self) -> bool:
@@ -656,7 +635,7 @@ class AndersenEvChargeStatusSensor(CoordinatorEntity, SensorEntity):
             _LOGGER.debug("Error updating charge status sensor: %s", err)
 
 
-class AndersenEvLiveSensor(CoordinatorEntity, SensorEntity):
+class AndersenEvLiveSensor(AndersenEvDeviceInfoMixin, CoordinatorEntity, SensorEntity):
     """Sensor for Andersen EV live status values."""
 
     _attr_has_entity_name = True
@@ -680,12 +659,13 @@ class AndersenEvLiveSensor(CoordinatorEntity, SensorEntity):
         self._data_key = data_key
         self._attr_name = name_suffix
         self._attr_unique_id = f"{device.device_id}_{sensor_type}"
-        self._attr_device_info = {
-            "identifiers": {(DOMAIN, device.device_id)},
-            "name": f"{device.friendly_name} ({device.device_id})",
-            "manufacturer": "Andersen EV",
-            "model": "A2",
-        }
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, device.device_id)},
+            name=f"{device.friendly_name} ({device.device_id})",
+            manufacturer="Andersen EV",
+            model="A2",
+            serial_number=f"{device.device_id}",
+        )
         if device_class:
             self._attr_device_class = device_class
         if state_class:
@@ -695,21 +675,6 @@ class AndersenEvLiveSensor(CoordinatorEntity, SensorEntity):
         if icon:
             self._attr_icon = icon
         self._update_model_from_device_status()
-
-    def _update_model_from_device_status(self):
-        """Update model information from device status if available."""
-        # First try to use the model name from the API if available
-        if hasattr(self._device, "model_name") and self._device.model_name:
-            self._attr_device_info["model"] = self._device.model_name
-        # Fall back to the information from device status
-        elif self._device.last_status:
-            status = self._device.last_status
-            if "sysProductName" in status:
-                self._attr_device_info["model"] = status["sysProductName"]
-            elif "sysProductId" in status:
-                self._attr_device_info["model"] = status["sysProductId"]
-            elif "sysHwVersion" in status:
-                self._attr_device_info["model"] = f"A2 (HW: {status['sysHwVersion']})"
 
     @property
     def available(self) -> bool:

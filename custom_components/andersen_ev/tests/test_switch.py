@@ -117,6 +117,74 @@ class TestAsyncSetupEntry:
         assert async_add_entities.call_args.args[0] == []
 
 
+class TestDynamicDevices:
+    """Tests for the dynamic-devices coordinator listener registered in async_setup_entry()."""
+
+    @pytest.mark.asyncio
+    async def test_new_device_scheduled_for_addition(self):
+        device_a = _make_device(device_id="device_1")
+        device_a.get_device_info = AsyncMock(
+            return_value={
+                "deviceInfo": {},
+                "deviceStatus": {"scheduleSlotsArray": [{"enabled": True}]},
+            }
+        )
+        coordinator = _make_coordinator([device_a])
+        entry = MagicMock()
+        entry.runtime_data = coordinator
+        async_add_entities = MagicMock()
+        hass = MagicMock()
+
+        await async_setup_entry(hass, entry, async_add_entities)
+
+        assert async_add_entities.call_count == 1
+        entry.async_on_unload.assert_called_once()
+        listener = coordinator.async_add_listener.call_args.args[0]
+
+        device_b = _make_device(device_id="device_2")
+        device_b.get_device_info = AsyncMock(
+            return_value={
+                "deviceInfo": {},
+                "deviceStatus": {"scheduleSlotsArray": [{"enabled": False}, {"enabled": True}]},
+            }
+        )
+        coordinator.data = [device_a, device_b]
+
+        listener()
+
+        hass.async_create_task.assert_called_once()
+        scheduled_coro = hass.async_create_task.call_args.args[0]
+        await scheduled_coro
+
+        assert async_add_entities.call_count == 2
+        new_entities = async_add_entities.call_args.args[0]
+        assert len(new_entities) == 2
+        assert all(entity._device.device_id == "device_2" for entity in new_entities)
+
+    @pytest.mark.asyncio
+    async def test_no_new_devices_does_not_schedule_a_task(self):
+        device_a = _make_device(device_id="device_1")
+        device_a.get_device_info = AsyncMock(
+            return_value={
+                "deviceInfo": {},
+                "deviceStatus": {"scheduleSlotsArray": [{"enabled": True}]},
+            }
+        )
+        coordinator = _make_coordinator([device_a])
+        entry = MagicMock()
+        entry.runtime_data = coordinator
+        async_add_entities = MagicMock()
+        hass = MagicMock()
+
+        await async_setup_entry(hass, entry, async_add_entities)
+        listener = coordinator.async_add_listener.call_args.args[0]
+
+        listener()
+
+        hass.async_create_task.assert_not_called()
+        assert async_add_entities.call_count == 1
+
+
 class TestInit:
     """Tests for AndersenEvScheduleSwitch.__init__()."""
 

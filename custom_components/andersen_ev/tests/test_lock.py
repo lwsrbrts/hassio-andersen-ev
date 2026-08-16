@@ -70,6 +70,48 @@ class TestAsyncSetupEntry:
         assert entities == []
 
 
+class TestDynamicDevices:
+    """Tests for the dynamic-devices coordinator listener registered in async_setup_entry()."""
+
+    @pytest.mark.asyncio
+    async def test_new_device_added_without_reload(self):
+        device_a = _make_device(device_id="device_1")
+        coordinator = _make_coordinator([device_a])
+        entry = MagicMock()
+        entry.runtime_data = coordinator
+        async_add_entities = MagicMock()
+
+        await async_setup_entry(MagicMock(), entry, async_add_entities)
+
+        assert async_add_entities.call_count == 1
+        entry.async_on_unload.assert_called_once()
+        listener = coordinator.async_add_listener.call_args.args[0]
+
+        device_b = _make_device(device_id="device_2")
+        coordinator.data = [device_a, device_b]
+        listener()
+
+        assert async_add_entities.call_count == 2
+        new_entities = async_add_entities.call_args.args[0]
+        assert len(new_entities) == 1
+        assert new_entities[0]._device.device_id == "device_2"
+
+    @pytest.mark.asyncio
+    async def test_no_new_devices_does_not_call_add_entities_again(self):
+        device_a = _make_device(device_id="device_1")
+        coordinator = _make_coordinator([device_a])
+        entry = MagicMock()
+        entry.runtime_data = coordinator
+        async_add_entities = MagicMock()
+
+        await async_setup_entry(MagicMock(), entry, async_add_entities)
+        listener = coordinator.async_add_listener.call_args.args[0]
+
+        listener()
+
+        assert async_add_entities.call_count == 1
+
+
 class TestInit:
     """Tests for AndersenEvLock.__init__()."""
 

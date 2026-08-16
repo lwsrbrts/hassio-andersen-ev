@@ -289,7 +289,7 @@ class TestAsyncSetupEntry:
             result = await async_setup_entry(hass, entry)
 
         mock_client_cls.assert_called_once_with("test@example.com", "testpass")
-        mock_coordinator_cls.assert_called_once_with(hass, mock_client_cls.return_value)
+        mock_coordinator_cls.assert_called_once_with(hass, entry, mock_client_cls.return_value)
         mock_coordinator.async_config_entry_first_refresh.assert_awaited_once()
         assert entry.runtime_data is mock_coordinator
         assert result is True

@@ -37,7 +37,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: AndersenEvConfigEntry) -
 
     client = KonnectClient(email, password)
 
-    coordinator = AndersenEvCoordinator(hass, client)
+    coordinator = AndersenEvCoordinator(hass, entry, client)
 
     # Fetch initial data so we have data when entities subscribe
     await coordinator.async_config_entry_first_refresh()
@@ -139,9 +139,15 @@ async def async_unload_entry(hass: HomeAssistant, entry: AndersenEvConfigEntry) 
 class AndersenEvCoordinator(DataUpdateCoordinator):
     """Data update coordinator for Andersen EV."""
 
-    def __init__(self, hass: HomeAssistant, client: KonnectClient) -> None:
+    def __init__(self, hass: HomeAssistant, entry: AndersenEvConfigEntry, client: KonnectClient) -> None:
         """Initialize the coordinator."""
-        super().__init__(hass, _LOGGER, name=DOMAIN, update_interval=timedelta(seconds=DEFAULT_SCAN_INTERVAL))
+        super().__init__(
+            hass,
+            _LOGGER,
+            config_entry=entry,
+            name=DOMAIN,
+            update_interval=timedelta(seconds=DEFAULT_SCAN_INTERVAL),
+        )
         self.client = client
         self.devices = []
         self._device_availability: dict[str, bool] = {}

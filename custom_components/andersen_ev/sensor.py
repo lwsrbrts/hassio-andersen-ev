@@ -82,12 +82,10 @@ async def async_setup_entry(
         )
 
         # Live status sensors
-        # NOTE: sysGridPower is declared KILO_WATT here while chargeStatus.gridPower
-        # below is declared WATT for what is plausibly the same physical quantity.
-        # At most one is right - unverified against real hardware (kettle test not
-        # yet run, see LOG.md Q10). sysSolarPower below deliberately mirrors this
-        # sensor's unit so the pair stays internally consistent whichever way that
-        # turns out. Do not change one without the other.
+        # sysGridPower/sysSolarPower are declared KILO_WATT; chargeStatus.gridPower
+        # below is declared WATT for the same physical quantity but only reports
+        # during a charge session. Verified correct via live kettle test - see
+        # LOG.md 2026-08-21.
         entities.append(
             AndersenEvLiveSensor(
                 coordinator,

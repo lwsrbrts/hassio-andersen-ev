@@ -82,6 +82,12 @@ async def async_setup_entry(
         )
 
         # Live status sensors
+        # NOTE: sysGridPower is declared KILO_WATT here while chargeStatus.gridPower
+        # below is declared WATT for what is plausibly the same physical quantity.
+        # At most one is right - unverified against real hardware (kettle test not
+        # yet run, see LOG.md Q10). sysSolarPower below deliberately mirrors this
+        # sensor's unit so the pair stays internally consistent whichever way that
+        # turns out. Do not change one without the other.
         entities.append(
             AndersenEvLiveSensor(
                 coordinator,
@@ -93,6 +99,94 @@ async def async_setup_entry(
                 SensorStateClass.MEASUREMENT,
                 UnitOfPower.KILO_WATT,
                 "mdi:transmission-tower",
+            )
+        )
+        # --- Solar live sensors -------------------------------------------------
+        # sysSolarPower/sysSolarEnergyDelta/sysChargePower are already fetched in
+        # the GraphQL query (konnect/const.py) but were never exposed as entities.
+        # They live in deviceStatus, not chargeStatus, so they report continuously
+        # - not just during a charge session - making this a whole-house solar
+        # monitor for free.
+        entities.append(
+            AndersenEvLiveSensor(
+                coordinator,
+                device,
+                "sys_solar_power",
+                "System Solar Power",
+                "sysSolarPower",
+                SensorDeviceClass.POWER,
+                SensorStateClass.MEASUREMENT,
+                UnitOfPower.KILO_WATT,
+                "mdi:solar-power",
+            )
+        )
+        entities.append(
+            AndersenEvLiveSensor(
+                coordinator,
+                device,
+                "sys_charge_power",
+                "System Charge Power",
+                "sysChargePower",
+                SensorDeviceClass.POWER,
+                SensorStateClass.MEASUREMENT,
+                UnitOfPower.KILO_WATT,
+                "mdi:ev-station",
+            )
+        )
+        entities.append(
+            AndersenEvLiveSensor(
+                coordinator,
+                device,
+                "sys_solar_energy_delta",
+                "System Solar Energy Delta",
+                "sysSolarEnergyDelta",
+                SensorDeviceClass.ENERGY,
+                SensorStateClass.TOTAL,
+                UnitOfEnergy.KILO_WATT_HOUR,
+                "mdi:solar-power",
+            )
+        )
+        # --- CT clamp diagnostics ------------------------------------------------
+        # Raw CT readings and configuration - not for the Energy dashboard. These
+        # exist to diagnose mis-clamped or mis-configured CTs, a common cause of
+        # solar generation reading suspiciously low.
+        entities.append(
+            AndersenEvLiveSensor(
+                coordinator,
+                device,
+                "sys_solar_ct",
+                "Solar CT",
+                "sysSolarCT",
+                None,
+                None,
+                None,
+                "mdi:gauge",
+            )
+        )
+        entities.append(
+            AndersenEvLiveSensor(
+                coordinator,
+                device,
+                "sys_grid_ct",
+                "Grid CT",
+                "sysGridCT",
+                None,
+                None,
+                None,
+                "mdi:gauge",
+            )
+        )
+        entities.append(
+            AndersenEvLiveSensor(
+                coordinator,
+                device,
+                "cfg_ct_config",
+                "CT Configuration",
+                "cfgCTConfig",
+                None,
+                None,
+                None,
+                "mdi:cog-outline",
             )
         )
         entities.append(

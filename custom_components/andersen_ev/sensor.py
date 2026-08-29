@@ -84,8 +84,7 @@ async def async_setup_entry(
         # Live status sensors
         # sysGridPower/sysSolarPower are declared KILO_WATT; chargeStatus.gridPower
         # below is declared WATT for the same physical quantity but only reports
-        # during a charge session. Verified correct via live kettle test - see
-        # LOG.md 2026-08-21.
+        # during a charge session. Unit verified via live load test (~2.9 kW kettle).
         entities.append(
             AndersenEvLiveSensor(
                 coordinator,

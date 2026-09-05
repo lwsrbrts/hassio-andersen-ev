@@ -184,6 +184,78 @@ class TestDynamicDevices:
         hass.async_create_task.assert_not_called()
         assert async_add_entities.call_count == 1
 
+    @pytest.mark.asyncio
+    async def test_device_readded_after_disappearing_is_scheduled_again(self):
+        """A device_id that drops out and reappears must not be treated as already known."""
+        device_a = _make_device(device_id="device_1")
+        device_a.get_device_info = AsyncMock(
+            return_value={
+                "deviceInfo": {},
+                "deviceStatus": {"scheduleSlotsArray": [{"enabled": True}]},
+            }
+        )
+        coordinator = _make_coordinator([device_a])
+        entry = MagicMock()
+        entry.runtime_data = coordinator
+        async_add_entities = MagicMock()
+        hass = MagicMock()
+
+        await async_setup_entry(hass, entry, async_add_entities)
+        listener = coordinator.async_add_listener.call_args.args[0]
+
+        # device_a drops out of the coordinator's data for a cycle.
+        coordinator.data = []
+        listener()
+        hass.async_create_task.assert_not_called()
+
+        # ...then reappears with the same device_id.
+        coordinator.data = [device_a]
+        listener()
+
+        hass.async_create_task.assert_called_once()
+        await hass.async_create_task.call_args.args[0]
+
+        assert async_add_entities.call_count == 2
+        new_entities = async_add_entities.call_args.args[0]
+        assert len(new_entities) == 1
+        assert new_entities[0]._device.device_id == "device_1"
+
+    @pytest.mark.asyncio
+    async def test_failed_switch_build_is_retried_on_next_update(self):
+        """If get_device_info() fails transiently, the device must not be stuck as known."""
+        device_a = _make_device(device_id="device_1")
+        coordinator = _make_coordinator([])
+        entry = MagicMock()
+        entry.runtime_data = coordinator
+        async_add_entities = MagicMock()
+        hass = MagicMock()
+
+        await async_setup_entry(hass, entry, async_add_entities)
+        listener = coordinator.async_add_listener.call_args.args[0]
+
+        # First attempt fails to retrieve device info (e.g. transient GraphQL error).
+        device_a.get_device_info = AsyncMock(return_value=None)
+        coordinator.data = [device_a]
+        listener()
+        hass.async_create_task.assert_called_once()
+        await hass.async_create_task.call_args.args[0]
+        assert async_add_entities.call_args.args[0] == []
+
+        # A later coordinator update must retry the same still-present device, not skip it.
+        device_a.get_device_info = AsyncMock(
+            return_value={
+                "deviceInfo": {},
+                "deviceStatus": {"scheduleSlotsArray": [{"enabled": True}]},
+            }
+        )
+        listener()
+
+        assert hass.async_create_task.call_count == 2
+        await hass.async_create_task.call_args.args[0]
+        new_entities = async_add_entities.call_args.args[0]
+        assert len(new_entities) == 1
+        assert new_entities[0]._device.device_id == "device_1"
+
 
 class TestInit:
     """Tests for AndersenEvScheduleSwitch.__init__()."""

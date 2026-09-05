@@ -120,6 +120,32 @@ class TestDynamicDevices:
 
         assert async_add_entities.call_count == 1
 
+    @pytest.mark.asyncio
+    async def test_device_readded_after_disappearing_gets_new_entities(self):
+        """A device_id that drops out and reappears must not be treated as already known."""
+        device_a = _make_device(device_id="device_1")
+        coordinator = _make_coordinator([device_a])
+        entry = MagicMock()
+        entry.runtime_data = coordinator
+        async_add_entities = MagicMock()
+
+        await async_setup_entry(MagicMock(), entry, async_add_entities)
+        listener = coordinator.async_add_listener.call_args.args[0]
+
+        # device_a drops out of the coordinator's data for a cycle.
+        coordinator.data = []
+        listener()
+        assert async_add_entities.call_count == 1
+
+        # ...then reappears with the same device_id.
+        coordinator.data = [device_a]
+        listener()
+
+        assert async_add_entities.call_count == 2
+        new_entities = async_add_entities.call_args.args[0]
+        assert len(new_entities) == 22
+        assert all(entity._device.device_id == "device_1" for entity in new_entities)
+
 
 class TestBaseSensorInit:
     """Tests for AndersenEvBaseSensor.__init__() via AndersenEvEnergySensor."""

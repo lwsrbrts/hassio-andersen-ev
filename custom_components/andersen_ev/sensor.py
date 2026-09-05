@@ -42,6 +42,7 @@ async def async_setup_entry(
 
     def _entities_for_new_devices() -> list[SensorEntity]:
         """Build sensor entities for any device not seen before."""
+        known_device_ids.intersection_update(device.device_id for device in coordinator.data)
         new_devices = [device for device in coordinator.data if device.device_id not in known_device_ids]
         entities: list[SensorEntity] = []
         for device in new_devices:

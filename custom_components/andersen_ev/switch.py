@@ -66,14 +66,24 @@ async def async_setup_entry(
     known_device_ids: set[str] = set()
 
     async def _async_add_switches_for_devices(devices) -> None:
-        """Fetch device info and create switches for the given devices."""
+        """Fetch device info and create switches for the given devices.
+
+        A device whose switches fail to build (e.g. a transient GraphQL error) is
+        unmarked so it's retried on the next coordinator update instead of being
+        permanently skipped.
+        """
         entities = []
         for device in devices:
-            entities.extend(await _async_build_switches_for_device(coordinator, device))
+            built = await _async_build_switches_for_device(coordinator, device)
+            if built:
+                entities.extend(built)
+            else:
+                known_device_ids.discard(device.device_id)
         async_add_entities(entities)
 
     def _handle_coordinator_update() -> None:
         """Schedule switch creation for any device not seen before."""
+        known_device_ids.intersection_update(device.device_id for device in coordinator.data)
         new_devices = [device for device in coordinator.data if device.device_id not in known_device_ids]
         if not new_devices:
             return

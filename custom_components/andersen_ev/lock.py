@@ -30,6 +30,7 @@ async def async_setup_entry(
 
     def _entities_for_new_devices() -> list[AndersenEvLock]:
         """Build lock entities for any device not seen before."""
+        known_device_ids.intersection_update(device.device_id for device in coordinator.data)
         new_devices = [device for device in coordinator.data if device.device_id not in known_device_ids]
         entities = []
         for device in new_devices:

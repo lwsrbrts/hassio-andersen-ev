@@ -9,6 +9,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import (
@@ -30,6 +31,27 @@ type AndersenEvConfigEntry = ConfigEntry[AndersenEvCoordinator]
 _LOGGER = logging.getLogger(__name__)
 
 
+def _make_stale_device_listener(hass: HomeAssistant, coordinator: "AndersenEvCoordinator"):
+    """Build a coordinator listener that removes devices no longer returned by the API.
+
+    Compares the device_id set on each coordinator refresh against the previous one; any
+    device_id that drops out gets its device-registry entry removed. Runs once (not per
+    platform) since it acts on the registry, not entities.
+    """
+    device_registry = dr.async_get(hass)
+    known_device_ids = {device.device_id for device in coordinator.data}
+
+    def _handle_stale_devices() -> None:
+        current_device_ids = {device.device_id for device in coordinator.data}
+        for device_id in known_device_ids - current_device_ids:
+            if device_entry := device_registry.async_get_device(identifiers={(DOMAIN, device_id)}):
+                device_registry.async_remove_device(device_entry.id)
+        known_device_ids.clear()
+        known_device_ids.update(current_device_ids)
+
+    return _handle_stale_devices
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: AndersenEvConfigEntry) -> bool:
     """Set up Andersen EV from a config entry."""
     email = entry.data["email"]
@@ -43,6 +65,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: AndersenEvConfigEntry) -
     await coordinator.async_config_entry_first_refresh()
 
     entry.runtime_data = coordinator
+
+    entry.async_on_unload(coordinator.async_add_listener(_make_stale_device_listener(hass, coordinator)))
 
     # Register services
     async def disable_all_schedules(call: ServiceCall) -> None:

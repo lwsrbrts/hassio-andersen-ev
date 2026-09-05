@@ -14,6 +14,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import AndersenEvConfigEntry, AndersenEvCoordinator
 from .const import DOMAIN
+from .entity import AndersenEvDeviceInfoMixin
 
 PARALLEL_UPDATES = 1
 
@@ -25,15 +26,27 @@ async def async_setup_entry(
 ) -> None:
     """Set up the Andersen EV lock platform."""
     coordinator = entry.runtime_data
+    known_device_ids: set[str] = set()
 
-    entities = []
-    for device in coordinator.data:
-        entities.append(AndersenEvLock(coordinator, device))
+    def _entities_for_new_devices() -> list[AndersenEvLock]:
+        """Build lock entities for any device not seen before."""
+        known_device_ids.intersection_update(device.device_id for device in coordinator.data)
+        new_devices = [device for device in coordinator.data if device.device_id not in known_device_ids]
+        entities = []
+        for device in new_devices:
+            known_device_ids.add(device.device_id)
+            entities.append(AndersenEvLock(coordinator, device))
+        return entities
 
-    async_add_entities(entities)
+    def _handle_coordinator_update() -> None:
+        if new_entities := _entities_for_new_devices():
+            async_add_entities(new_entities)
+
+    async_add_entities(_entities_for_new_devices())
+    entry.async_on_unload(coordinator.async_add_listener(_handle_coordinator_update))
 
 
-class AndersenEvLock(CoordinatorEntity, LockEntity):  # pylint: disable=abstract-method
+class AndersenEvLock(AndersenEvDeviceInfoMixin, CoordinatorEntity, LockEntity):  # pylint: disable=abstract-method
     """Representation of an Andersen EV charging lock."""
 
     _attr_has_entity_name = True
@@ -53,21 +66,6 @@ class AndersenEvLock(CoordinatorEntity, LockEntity):  # pylint: disable=abstract
         )
         # Update model if device status is already available
         self._update_model_from_device_status()
-
-    def _update_model_from_device_status(self):
-        """Update model information from device status if available."""
-        # First try to use the model name from the API if available
-        if hasattr(self._device, "model_name") and self._device.model_name:
-            self._attr_device_info["model"] = self._device.model_name
-        # Fall back to the information from device status
-        elif self._device.last_status:
-            status = self._device.last_status
-            if "sysProductName" in status:
-                self._attr_device_info["model"] = status["sysProductName"]
-            elif "sysProductId" in status:
-                self._attr_device_info["model"] = status["sysProductId"]
-            elif "sysHwVersion" in status:
-                self._attr_device_info["model"] = f"A2 (HW: {status['sysHwVersion']})"
 
     @property
     def available(self) -> bool:

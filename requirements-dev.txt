@@ -1,5 +1,5 @@
 -r requirements.txt
-homeassistant==2026.8.1
+homeassistant==2026.8.3
 ruff==0.16.5
 pytest
 pytest-asyncio

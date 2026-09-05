@@ -9,7 +9,7 @@ from pycognito.aws_srp import AWSSRP
 
 from . import const
 from .device import KonnectDevice
-from .exceptions import AndersenAuthError, AndersenConnectionError
+from .exceptions import AndersenApiError, AndersenAuthError, AndersenConnectionError
 
 POOL_ID = "eu-west-1_t5HV3bFjl"
 POOL_REGION = "eu-west-1"
@@ -200,7 +200,10 @@ class KonnectClient:
 
         response_body = response.json()
 
-        if not response_body.get("devices"):
+        if "devices" not in response_body:
+            raise AndersenApiError("Unexpected API response shape: missing 'devices' key")
+
+        if not response_body["devices"]:
             _LOGGER.warning("No devices found in API response")
             return devices
 

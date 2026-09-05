@@ -8,7 +8,7 @@ import pytest
 from botocore.exceptions import ClientError
 
 from andersen_ev.konnect.client import KonnectClient
-from andersen_ev.konnect.exceptions import AndersenAuthError, AndersenConnectionError
+from andersen_ev.konnect.exceptions import AndersenApiError, AndersenAuthError, AndersenConnectionError
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -426,6 +426,22 @@ class TestGetDevices:
             devices = await client.getDevices()
 
         assert devices == []
+
+    @pytest.mark.asyncio
+    async def test_get_devices_missing_devices_key_raises_api_error(self):
+        """getDevices() raises AndersenApiError when the response body has no 'devices' key at all."""
+        client = KonnectClient("user@example.com", "password")
+        client.ensure_valid_auth = AsyncMock()
+        client.token = "abc"
+
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"unexpected": "shape"}
+
+        with patch("andersen_ev.konnect.client.requests") as mock_requests:
+            mock_requests.get.return_value = mock_response
+            with pytest.raises(AndersenApiError):
+                await client.getDevices()
 
     @pytest.mark.asyncio
     async def test_get_devices_retries_after_401(self):

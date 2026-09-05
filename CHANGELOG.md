@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.11.0](https://github.com/HA-AndersenEV/hassio-andersen-ev/compare/v0.10.0...v0.11.0) (2026-09-05)
+
+
+### Features
+
+* downloadable diagnostics with redacted credentials ([#77](https://github.com/HA-AndersenEV/hassio-andersen-ev/issues/77)) ([14c18b4](https://github.com/HA-AndersenEV/hassio-andersen-ev/commit/14c18b413db9ce81fba772f32d523c8211bbd466))
+* keep charger devices in sync automatically ([#78](https://github.com/HA-AndersenEV/hassio-andersen-ev/issues/78)) ([9338af4](https://github.com/HA-AndersenEV/hassio-andersen-ev/commit/9338af4e9c7f66f5836aa199aeddaec6ea18f77a))
+
+
+### Bug Fixes
+
+* resolve a Home Assistant deprecation warning and update test tooling ([#75](https://github.com/HA-AndersenEV/hassio-andersen-ev/issues/75)) ([612c9c8](https://github.com/HA-AndersenEV/hassio-andersen-ev/commit/612c9c869fc9fd63b07251f618e4bf5f4270086b))
+* stop PR title check from getting stuck on rapid rebases ([#87](https://github.com/HA-AndersenEV/hassio-andersen-ev/issues/87)) ([1fbb69f](https://github.com/HA-AndersenEV/hassio-andersen-ev/commit/1fbb69fedce140c6fe781597f82e0bc2da1493c0))
+
 ## [0.10.0](https://github.com/HA-AndersenEV/hassio-andersen-ev/compare/v0.9.0...v0.10.0) (2026-07-19)
 
 

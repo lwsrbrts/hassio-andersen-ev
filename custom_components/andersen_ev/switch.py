@@ -9,16 +9,51 @@ from typing import Any
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers.entity import DeviceInfo, EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import AndersenEvConfigEntry, AndersenEvCoordinator
 from .const import DOMAIN
+from .entity import AndersenEvDeviceInfoMixin
 from .konnect import const
 
 PARALLEL_UPDATES = 1
 
 _LOGGER = logging.getLogger(__name__)
+
+
+async def _async_build_switches_for_device(
+    coordinator: AndersenEvCoordinator, device
+) -> list[AndersenEvScheduleSwitch]:
+    """Build schedule switches for a single device (fetches device info)."""
+    # Get device info including schedule names and schedule slots
+    device_info = await device.get_device_info()
+    if not device_info or "deviceInfo" not in device_info:
+        _LOGGER.warning("Could not retrieve device info for %s", device.friendly_name)
+        return []
+
+    # Get schedule slots from device_info
+    if "deviceStatus" not in device_info or "scheduleSlotsArray" not in device_info["deviceStatus"]:
+        _LOGGER.warning("Could not retrieve schedule slots for %s", device.friendly_name)
+        return []
+
+    schedule_slots = device_info["deviceStatus"]["scheduleSlotsArray"]
+    device_info_data = device_info["deviceInfo"]
+
+    # Create switches for each schedule
+    entities = []
+    for idx, _slot in enumerate(schedule_slots):
+        # Get the schedule name from deviceInfo if available
+        schedule_name_key = f"schedule{idx}Name"
+        if device_info_data.get(schedule_name_key):
+            schedule_name = device_info_data[schedule_name_key]
+        else:
+            schedule_name = f"Schedule {idx + 1}"
+
+        entities.append(AndersenEvScheduleSwitch(coordinator, device, idx, schedule_name))
+
+    return entities
 
 
 async def async_setup_entry(
@@ -28,41 +63,47 @@ async def async_setup_entry(
 ) -> None:
     """Set up the Andersen EV schedule switches."""
     coordinator = entry.runtime_data
+    known_device_ids: set[str] = set()
 
-    entities = []
-    for device in coordinator.data:
-        # Get device info including schedule names and schedule slots
-        device_info = await device.get_device_info()
-        if not device_info or "deviceInfo" not in device_info:
-            _LOGGER.warning("Could not retrieve device info for %s", device.friendly_name)
-            continue
+    async def _async_add_switches_for_devices(devices) -> None:
+        """Fetch device info and create switches for the given devices.
 
-        # Get schedule slots from device_info
-        if "deviceStatus" not in device_info or "scheduleSlotsArray" not in device_info["deviceStatus"]:
-            _LOGGER.warning("Could not retrieve schedule slots for %s", device.friendly_name)
-            continue
-
-        schedule_slots = device_info["deviceStatus"]["scheduleSlotsArray"]
-        device_info_data = device_info["deviceInfo"]
-
-        # Create switches for each schedule
-        for idx, _slot in enumerate(schedule_slots):
-            # Get the schedule name from deviceInfo if available
-            schedule_name_key = f"schedule{idx}Name"
-            if device_info_data.get(schedule_name_key):
-                schedule_name = device_info_data[schedule_name_key]
+        A device whose switches fail to build (e.g. a transient GraphQL error) is
+        unmarked so it's retried on the next coordinator update instead of being
+        permanently skipped.
+        """
+        entities = []
+        for device in devices:
+            built = await _async_build_switches_for_device(coordinator, device)
+            if built:
+                entities.extend(built)
             else:
-                schedule_name = f"Schedule {idx + 1}"
+                known_device_ids.discard(device.device_id)
+        async_add_entities(entities)
 
-            entities.append(AndersenEvScheduleSwitch(coordinator, device, idx, schedule_name))
+    def _handle_coordinator_update() -> None:
+        """Schedule switch creation for any device not seen before."""
+        known_device_ids.intersection_update(device.device_id for device in coordinator.data)
+        new_devices = [device for device in coordinator.data if device.device_id not in known_device_ids]
+        if not new_devices:
+            return
+        for device in new_devices:
+            known_device_ids.add(device.device_id)
+        hass.async_create_task(_async_add_switches_for_devices(new_devices))
 
-    async_add_entities(entities)
+    initial_devices = list(coordinator.data)
+    for device in initial_devices:
+        known_device_ids.add(device.device_id)
+    await _async_add_switches_for_devices(initial_devices)
+
+    entry.async_on_unload(coordinator.async_add_listener(_handle_coordinator_update))
 
 
-class AndersenEvScheduleSwitch(CoordinatorEntity, SwitchEntity):  # pylint: disable=abstract-method
+class AndersenEvScheduleSwitch(AndersenEvDeviceInfoMixin, CoordinatorEntity, SwitchEntity):  # pylint: disable=abstract-method
     """Representation of an Andersen EV charging schedule switch."""
 
     _attr_has_entity_name = True
+    _attr_entity_category = EntityCategory.CONFIG
 
     def __init__(
         self,
@@ -76,15 +117,16 @@ class AndersenEvScheduleSwitch(CoordinatorEntity, SwitchEntity):  # pylint: disa
         self._device = device
         self._schedule_index = index
         self._schedule_name = schedule_name
-        self._attr_name = f"Schedule {index + 1}"
+        self._attr_translation_key = "schedule"
+        self._attr_translation_placeholders = {"index": str(index + 1)}
         self._attr_unique_id = f"{device.device_id}_schedule_{index}"
-        self._attr_device_info = {
-            "identifiers": {(DOMAIN, device.device_id)},
-            "name": f"{device.friendly_name} ({device.device_id})",
-            "manufacturer": "Andersen EV",
-            "model": "A2",
-        }
-        self._attr_icon = "mdi:calendar-clock"
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, device.device_id)},
+            name=f"{device.friendly_name} ({device.device_id})",
+            manufacturer="Andersen EV",
+            model="A2",
+            serial_number=f"{device.device_id}",
+        )
         self._update_model_from_device_status()
 
     @property
@@ -94,21 +136,6 @@ class AndersenEvScheduleSwitch(CoordinatorEntity, SwitchEntity):  # pylint: disa
             "schedule_name": self._schedule_name,
             "schedule_index": self._schedule_index,
         }
-
-    def _update_model_from_device_status(self):
-        """Update model information from device status if available."""
-        # First try to use the model name from the API if available
-        if hasattr(self._device, "model_name") and self._device.model_name:
-            self._attr_device_info["model"] = self._device.model_name
-        # Fall back to the information from device status
-        elif self._device.last_status:
-            status = self._device.last_status
-            if "sysProductName" in status:
-                self._attr_device_info["model"] = status["sysProductName"]
-            elif "sysProductId" in status:
-                self._attr_device_info["model"] = status["sysProductId"]
-            elif "sysHwVersion" in status:
-                self._attr_device_info["model"] = f"A2 (HW: {status['sysHwVersion']})"
 
     @property
     def available(self) -> bool:
@@ -163,7 +190,11 @@ class AndersenEvScheduleSwitch(CoordinatorEntity, SwitchEntity):  # pylint: disa
                     or "deviceStatus" not in device_info
                     or "scheduleSlotsArray" not in device_info["deviceStatus"]
                 ):
-                    raise HomeAssistantError("Failed to retrieve schedule data")
+                    raise HomeAssistantError(
+                        translation_domain=DOMAIN,
+                        translation_key="schedule_data_unavailable",
+                        translation_placeholders={"device_name": self._device.friendly_name},
+                    )
                 schedule_slots = copy.deepcopy(device_info["deviceStatus"]["scheduleSlotsArray"])
             else:
                 # Use the data from the coordinator
@@ -200,12 +231,27 @@ class AndersenEvScheduleSwitch(CoordinatorEntity, SwitchEntity):  # pylint: disa
                     # Request a refresh of the coordinator data to update all entities
                     await self.coordinator.async_request_refresh()
                 else:
-                    raise HomeAssistantError(f"Failed to update schedule for {self._device.friendly_name}")
+                    raise HomeAssistantError(
+                        translation_domain=DOMAIN,
+                        translation_key="schedule_update_failed",
+                        translation_placeholders={"device_name": self._device.friendly_name},
+                    )
             else:
-                raise HomeAssistantError(f"Schedule index {self._schedule_index} out of range")
+                raise HomeAssistantError(
+                    translation_domain=DOMAIN,
+                    translation_key="schedule_index_out_of_range",
+                    translation_placeholders={
+                        "index": str(self._schedule_index),
+                        "device_name": self._device.friendly_name,
+                    },
+                )
 
         except Exception as err:  # pylint: disable=broad-exception-caught
-            raise HomeAssistantError(f"Failed to update schedule: {err}") from err
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="schedule_update_error",
+                translation_placeholders={"device_name": self._device.friendly_name, "error": str(err)},
+            ) from err
 
     async def _send_set_schedules_mutation(self, schedule_slots, enabled=None) -> bool:
         """Send the setSchedules mutation to the Andersen EV API."""

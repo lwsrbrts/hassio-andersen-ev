@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from homeassistant.components.sensor import SensorDeviceClass, SensorStateClass
 from homeassistant.const import UnitOfEnergy, UnitOfPower
+from homeassistant.helpers.entity import EntityCategory
 
 from andersen_ev.sensor import (
     AndersenEvChargeStatusSensor,
@@ -12,6 +13,7 @@ from andersen_ev.sensor import (
     AndersenEvCostSensor,
     AndersenEvEnergySensor,
     AndersenEvLiveSensor,
+    _build_entities_for_device,
     async_setup_entry,
 )
 
@@ -79,6 +81,74 @@ class TestAsyncSetupEntry:
         assert async_add_entities.call_args.args[0] == []
 
 
+class TestDynamicDevices:
+    """Tests for the dynamic-devices coordinator listener registered in async_setup_entry()."""
+
+    @pytest.mark.asyncio
+    async def test_new_device_added_without_reload(self):
+        device_a = _make_device(device_id="device_1")
+        coordinator = _make_coordinator([device_a])
+        entry = MagicMock()
+        entry.runtime_data = coordinator
+        async_add_entities = MagicMock()
+
+        await async_setup_entry(MagicMock(), entry, async_add_entities)
+
+        assert async_add_entities.call_count == 1
+        entry.async_on_unload.assert_called_once()
+        listener = coordinator.async_add_listener.call_args.args[0]
+
+        device_b = _make_device(device_id="device_2")
+        coordinator.data = [device_a, device_b]
+        listener()
+
+        assert async_add_entities.call_count == 2
+        new_entities = async_add_entities.call_args.args[0]
+        assert len(new_entities) == 22
+        assert all(entity._device.device_id == "device_2" for entity in new_entities)
+
+    @pytest.mark.asyncio
+    async def test_no_new_devices_does_not_call_add_entities_again(self):
+        device_a = _make_device(device_id="device_1")
+        coordinator = _make_coordinator([device_a])
+        entry = MagicMock()
+        entry.runtime_data = coordinator
+        async_add_entities = MagicMock()
+
+        await async_setup_entry(MagicMock(), entry, async_add_entities)
+        listener = coordinator.async_add_listener.call_args.args[0]
+
+        listener()
+
+        assert async_add_entities.call_count == 1
+
+    @pytest.mark.asyncio
+    async def test_device_readded_after_disappearing_gets_new_entities(self):
+        """A device_id that drops out and reappears must not be treated as already known."""
+        device_a = _make_device(device_id="device_1")
+        coordinator = _make_coordinator([device_a])
+        entry = MagicMock()
+        entry.runtime_data = coordinator
+        async_add_entities = MagicMock()
+
+        await async_setup_entry(MagicMock(), entry, async_add_entities)
+        listener = coordinator.async_add_listener.call_args.args[0]
+
+        # device_a drops out of the coordinator's data for a cycle.
+        coordinator.data = []
+        listener()
+        assert async_add_entities.call_count == 1
+
+        # ...then reappears with the same device_id.
+        coordinator.data = [device_a]
+        listener()
+
+        assert async_add_entities.call_count == 2
+        new_entities = async_add_entities.call_args.args[0]
+        assert len(new_entities) == 22
+        assert all(entity._device.device_id == "device_1" for entity in new_entities)
+
+
 class TestBaseSensorInit:
     """Tests for AndersenEvBaseSensor.__init__() via AndersenEvEnergySensor."""
 
@@ -86,30 +156,12 @@ class TestBaseSensorInit:
         device = _make_device(device_id="device_1", friendly_name="My Charger")
         coordinator = _make_coordinator([device])
 
-        sensor = AndersenEvEnergySensor(coordinator, device, "energy", "Total Energy", "chargeEnergyTotal")
+        sensor = AndersenEvEnergySensor(coordinator, device, "energy", "chargeEnergyTotal")
 
         assert sensor._attr_unique_id == "device_1_energy"
-        assert sensor._attr_name == "Total Energy"
+        assert sensor._attr_translation_key == "energy"
         assert sensor._attr_device_info["name"] == "My Charger (device_1)"
         assert sensor._attr_has_entity_name is True
-
-    def test_icon_set_when_provided(self):
-        device = _make_device()
-        coordinator = _make_coordinator([device])
-
-        sensor = AndersenEvEnergySensor(
-            coordinator, device, "energy", "Total Energy", "chargeEnergyTotal", icon="mdi:custom"
-        )
-
-        assert sensor._attr_icon == "mdi:custom"
-
-    def test_icon_not_set_when_absent(self):
-        device = _make_device()
-        coordinator = _make_coordinator([device])
-
-        sensor = AndersenEvEnergySensor(coordinator, device, "energy", "Total Energy", "chargeEnergyTotal")
-
-        assert not hasattr(sensor, "_attr_icon")
 
 
 class TestBaseSensorUpdateModelFromDeviceStatus:
@@ -119,7 +171,7 @@ class TestBaseSensorUpdateModelFromDeviceStatus:
         device = _make_device(model_name="Andersen A3")
         coordinator = _make_coordinator([device])
 
-        sensor = AndersenEvEnergySensor(coordinator, device, "energy", "Total Energy", "chargeEnergyTotal")
+        sensor = AndersenEvEnergySensor(coordinator, device, "energy", "chargeEnergyTotal")
 
         assert sensor._attr_device_info["model"] == "Andersen A3"
 
@@ -127,7 +179,7 @@ class TestBaseSensorUpdateModelFromDeviceStatus:
         device = _make_device(last_status={"sysProductName": "Andersen A2 Pro"})
         coordinator = _make_coordinator([device])
 
-        sensor = AndersenEvEnergySensor(coordinator, device, "energy", "Total Energy", "chargeEnergyTotal")
+        sensor = AndersenEvEnergySensor(coordinator, device, "energy", "chargeEnergyTotal")
 
         assert sensor._attr_device_info["model"] == "Andersen A2 Pro"
 
@@ -135,7 +187,7 @@ class TestBaseSensorUpdateModelFromDeviceStatus:
         device = _make_device(last_status={"sysProductId": "A2"})
         coordinator = _make_coordinator([device])
 
-        sensor = AndersenEvEnergySensor(coordinator, device, "energy", "Total Energy", "chargeEnergyTotal")
+        sensor = AndersenEvEnergySensor(coordinator, device, "energy", "chargeEnergyTotal")
 
         assert sensor._attr_device_info["model"] == "A2"
 
@@ -143,7 +195,7 @@ class TestBaseSensorUpdateModelFromDeviceStatus:
         device = _make_device(last_status={"sysHwVersion": "1.5"})
         coordinator = _make_coordinator([device])
 
-        sensor = AndersenEvEnergySensor(coordinator, device, "energy", "Total Energy", "chargeEnergyTotal")
+        sensor = AndersenEvEnergySensor(coordinator, device, "energy", "chargeEnergyTotal")
 
         assert sensor._attr_device_info["model"] == "A2 (HW: 1.5)"
 
@@ -151,7 +203,7 @@ class TestBaseSensorUpdateModelFromDeviceStatus:
         device = _make_device(last_status=None)
         coordinator = _make_coordinator([device])
 
-        sensor = AndersenEvEnergySensor(coordinator, device, "energy", "Total Energy", "chargeEnergyTotal")
+        sensor = AndersenEvEnergySensor(coordinator, device, "energy", "chargeEnergyTotal")
 
         assert sensor._attr_device_info["model"] == "A2"
 
@@ -162,7 +214,7 @@ class TestBaseSensorAvailable:
     def test_available_when_update_success_and_last_charge_present(self):
         device = _make_device()
         coordinator = _make_coordinator([device], last_update_success=True)
-        sensor = AndersenEvEnergySensor(coordinator, device, "energy", "Total Energy", "chargeEnergyTotal")
+        sensor = AndersenEvEnergySensor(coordinator, device, "energy", "chargeEnergyTotal")
         sensor._last_charge = {"chargeEnergyTotal": 1.0}
 
         assert sensor.available is True
@@ -170,7 +222,7 @@ class TestBaseSensorAvailable:
     def test_unavailable_when_last_charge_none(self):
         device = _make_device()
         coordinator = _make_coordinator([device], last_update_success=True)
-        sensor = AndersenEvEnergySensor(coordinator, device, "energy", "Total Energy", "chargeEnergyTotal")
+        sensor = AndersenEvEnergySensor(coordinator, device, "energy", "chargeEnergyTotal")
         sensor._last_charge = None
 
         assert sensor.available is False
@@ -178,7 +230,7 @@ class TestBaseSensorAvailable:
     def test_unavailable_when_coordinator_update_failed(self):
         device = _make_device()
         coordinator = _make_coordinator([device], last_update_success=False)
-        sensor = AndersenEvEnergySensor(coordinator, device, "energy", "Total Energy", "chargeEnergyTotal")
+        sensor = AndersenEvEnergySensor(coordinator, device, "energy", "chargeEnergyTotal")
         sensor._last_charge = {"chargeEnergyTotal": 1.0}
 
         assert sensor.available is False
@@ -191,7 +243,7 @@ class TestBaseSensorAsyncAddedToHass:
     async def test_updates_last_charge(self):
         device = _make_device()
         coordinator = _make_coordinator([device])
-        sensor = AndersenEvEnergySensor(coordinator, device, "energy", "Total Energy", "chargeEnergyTotal")
+        sensor = AndersenEvEnergySensor(coordinator, device, "energy", "chargeEnergyTotal")
         sensor._update_last_charge = AsyncMock()
 
         await sensor.async_added_to_hass()
@@ -206,7 +258,7 @@ class TestBaseSensorAsyncUpdate:
     async def test_updates_last_charge(self):
         device = _make_device()
         coordinator = _make_coordinator([device])
-        sensor = AndersenEvEnergySensor(coordinator, device, "energy", "Total Energy", "chargeEnergyTotal")
+        sensor = AndersenEvEnergySensor(coordinator, device, "energy", "chargeEnergyTotal")
         sensor._update_last_charge = AsyncMock()
 
         await sensor.async_update()
@@ -221,7 +273,7 @@ class TestUpdateLastCharge:
     async def test_fetches_last_charge_and_updates_model(self):
         device = _make_device(last_status={"sysProductName": "Andersen A2 Pro"}, last_charge={"chargeEnergyTotal": 5})
         coordinator = _make_coordinator([device])
-        sensor = AndersenEvEnergySensor(coordinator, device, "energy", "Total Energy", "chargeEnergyTotal")
+        sensor = AndersenEvEnergySensor(coordinator, device, "energy", "chargeEnergyTotal")
 
         await sensor._update_last_charge()
 
@@ -232,7 +284,7 @@ class TestUpdateLastCharge:
     async def test_no_status_skips_model_update(self):
         device = _make_device(last_status=None, last_charge={"chargeEnergyTotal": 5})
         coordinator = _make_coordinator([device])
-        sensor = AndersenEvEnergySensor(coordinator, device, "energy", "Total Energy", "chargeEnergyTotal")
+        sensor = AndersenEvEnergySensor(coordinator, device, "energy", "chargeEnergyTotal")
 
         await sensor._update_last_charge()
 
@@ -245,7 +297,7 @@ class TestEnergySensorNativeValue:
     def test_returns_value_from_last_charge(self):
         device = _make_device()
         coordinator = _make_coordinator([device])
-        sensor = AndersenEvEnergySensor(coordinator, device, "energy", "Total Energy", "chargeEnergyTotal")
+        sensor = AndersenEvEnergySensor(coordinator, device, "energy", "chargeEnergyTotal")
         sensor._last_charge = {"chargeEnergyTotal": 15.5}
 
         assert sensor.native_value == 15.5
@@ -253,7 +305,7 @@ class TestEnergySensorNativeValue:
     def test_returns_none_when_key_missing(self):
         device = _make_device()
         coordinator = _make_coordinator([device])
-        sensor = AndersenEvEnergySensor(coordinator, device, "energy", "Total Energy", "chargeEnergyTotal")
+        sensor = AndersenEvEnergySensor(coordinator, device, "energy", "chargeEnergyTotal")
         sensor._last_charge = {"other": 1}
 
         assert sensor.native_value is None
@@ -261,7 +313,7 @@ class TestEnergySensorNativeValue:
     def test_returns_none_when_no_last_charge(self):
         device = _make_device()
         coordinator = _make_coordinator([device])
-        sensor = AndersenEvEnergySensor(coordinator, device, "energy", "Total Energy", "chargeEnergyTotal")
+        sensor = AndersenEvEnergySensor(coordinator, device, "energy", "chargeEnergyTotal")
         sensor._last_charge = None
 
         assert sensor.native_value is None
@@ -273,7 +325,7 @@ class TestCostSensorNativeValue:
     def test_returns_value_from_last_charge(self):
         device = _make_device()
         coordinator = _make_coordinator([device])
-        sensor = AndersenEvCostSensor(coordinator, device, "cost", "Total Cost", "chargeCostTotal")
+        sensor = AndersenEvCostSensor(coordinator, device, "cost", "chargeCostTotal")
         sensor._last_charge = {"chargeCostTotal": 4.5}
 
         assert sensor.native_value == 4.5
@@ -281,7 +333,7 @@ class TestCostSensorNativeValue:
     def test_returns_none_when_key_missing(self):
         device = _make_device()
         coordinator = _make_coordinator([device])
-        sensor = AndersenEvCostSensor(coordinator, device, "cost", "Total Cost", "chargeCostTotal")
+        sensor = AndersenEvCostSensor(coordinator, device, "cost", "chargeCostTotal")
         sensor._last_charge = {"other": 1}
 
         assert sensor.native_value is None
@@ -289,39 +341,22 @@ class TestCostSensorNativeValue:
     def test_returns_none_when_no_last_charge(self):
         device = _make_device()
         coordinator = _make_coordinator([device])
-        sensor = AndersenEvCostSensor(coordinator, device, "cost", "Total Cost", "chargeCostTotal")
+        sensor = AndersenEvCostSensor(coordinator, device, "cost", "chargeCostTotal")
         sensor._last_charge = None
 
         assert sensor.native_value is None
-
-    def test_icon_set_when_provided(self):
-        device = _make_device()
-        coordinator = _make_coordinator([device])
-
-        sensor = AndersenEvCostSensor(coordinator, device, "cost", "Total Cost", "chargeCostTotal", icon="mdi:cash")
-
-        assert sensor._attr_icon == "mdi:cash"
 
 
 class TestConnectorSensorInit:
     """Tests for AndersenEvConnectorSensor.__init__()."""
 
-    def test_default_icon(self):
+    def test_default_translation_key(self):
         device = _make_device()
         coordinator = _make_coordinator([device])
 
         sensor = AndersenEvConnectorSensor(coordinator, device)
 
-        assert sensor._attr_icon == "mdi:ev-plug-type2"
-        assert sensor._attr_name == "Connector"
-
-    def test_custom_icon(self):
-        device = _make_device()
-        coordinator = _make_coordinator([device])
-
-        sensor = AndersenEvConnectorSensor(coordinator, device, icon="mdi:custom")
-
-        assert sensor._attr_icon == "mdi:custom"
+        assert sensor._attr_translation_key == "connector"
 
 
 class TestConnectorSensorUpdateModelFromDeviceStatus:
@@ -503,24 +538,21 @@ class TestChargeStatusSensorInit:
             coordinator,
             device,
             "charge_power",
-            "Charge Power",
             "chargePower",
             device_class=SensorDeviceClass.POWER,
             state_class=SensorStateClass.MEASUREMENT,
             unit=UnitOfPower.WATT,
-            icon="mdi:ev-station",
         )
 
         assert sensor._attr_device_class == SensorDeviceClass.POWER
         assert sensor._attr_state_class == SensorStateClass.MEASUREMENT
         assert sensor._attr_native_unit_of_measurement == UnitOfPower.WATT
-        assert sensor._attr_icon == "mdi:ev-station"
 
     def test_optional_attributes_omitted_when_absent(self):
         device = _make_device()
         coordinator = _make_coordinator([device])
 
-        sensor = AndersenEvChargeStatusSensor(coordinator, device, "charge_power", "Charge Power", "chargePower")
+        sensor = AndersenEvChargeStatusSensor(coordinator, device, "charge_power", "chargePower")
 
         assert sensor._attr_unique_id == f"{device.device_id}_charge_power"
 
@@ -532,7 +564,7 @@ class TestChargeStatusSensorUpdateModelFromDeviceStatus:
         device = _make_device(model_name="Andersen A3")
         coordinator = _make_coordinator([device])
 
-        sensor = AndersenEvChargeStatusSensor(coordinator, device, "charge_power", "Charge Power", "chargePower")
+        sensor = AndersenEvChargeStatusSensor(coordinator, device, "charge_power", "chargePower")
 
         assert sensor._attr_device_info["model"] == "Andersen A3"
 
@@ -540,7 +572,7 @@ class TestChargeStatusSensorUpdateModelFromDeviceStatus:
         device = _make_device(last_status={"sysProductName": "Andersen A2 Pro"})
         coordinator = _make_coordinator([device])
 
-        sensor = AndersenEvChargeStatusSensor(coordinator, device, "charge_power", "Charge Power", "chargePower")
+        sensor = AndersenEvChargeStatusSensor(coordinator, device, "charge_power", "chargePower")
 
         assert sensor._attr_device_info["model"] == "Andersen A2 Pro"
 
@@ -548,7 +580,7 @@ class TestChargeStatusSensorUpdateModelFromDeviceStatus:
         device = _make_device(last_status={"sysProductId": "A2"})
         coordinator = _make_coordinator([device])
 
-        sensor = AndersenEvChargeStatusSensor(coordinator, device, "charge_power", "Charge Power", "chargePower")
+        sensor = AndersenEvChargeStatusSensor(coordinator, device, "charge_power", "chargePower")
 
         assert sensor._attr_device_info["model"] == "A2"
 
@@ -556,7 +588,7 @@ class TestChargeStatusSensorUpdateModelFromDeviceStatus:
         device = _make_device(last_status={"sysHwVersion": "1.5"})
         coordinator = _make_coordinator([device])
 
-        sensor = AndersenEvChargeStatusSensor(coordinator, device, "charge_power", "Charge Power", "chargePower")
+        sensor = AndersenEvChargeStatusSensor(coordinator, device, "charge_power", "chargePower")
 
         assert sensor._attr_device_info["model"] == "A2 (HW: 1.5)"
 
@@ -564,7 +596,7 @@ class TestChargeStatusSensorUpdateModelFromDeviceStatus:
         device = _make_device(last_status=None)
         coordinator = _make_coordinator([device])
 
-        sensor = AndersenEvChargeStatusSensor(coordinator, device, "charge_power", "Charge Power", "chargePower")
+        sensor = AndersenEvChargeStatusSensor(coordinator, device, "charge_power", "chargePower")
 
         assert sensor._attr_device_info["model"] == "A2"
 
@@ -575,28 +607,28 @@ class TestChargeStatusSensorAvailable:
     def test_available_when_charge_status_present(self):
         device = _make_device(last_status={"chargeStatus": {"chargePower": 1000}}, status_available=True)
         coordinator = _make_coordinator([device], last_update_success=True)
-        sensor = AndersenEvChargeStatusSensor(coordinator, device, "charge_power", "Charge Power", "chargePower")
+        sensor = AndersenEvChargeStatusSensor(coordinator, device, "charge_power", "chargePower")
 
         assert sensor.available is True
 
     def test_unavailable_when_charge_status_missing(self):
         device = _make_device(last_status={"other": True}, status_available=True)
         coordinator = _make_coordinator([device], last_update_success=True)
-        sensor = AndersenEvChargeStatusSensor(coordinator, device, "charge_power", "Charge Power", "chargePower")
+        sensor = AndersenEvChargeStatusSensor(coordinator, device, "charge_power", "chargePower")
 
         assert sensor.available is False
 
     def test_unavailable_when_no_status(self):
         device = _make_device(last_status=None, status_available=True)
         coordinator = _make_coordinator([device], last_update_success=True)
-        sensor = AndersenEvChargeStatusSensor(coordinator, device, "charge_power", "Charge Power", "chargePower")
+        sensor = AndersenEvChargeStatusSensor(coordinator, device, "charge_power", "chargePower")
 
         assert sensor.available is False
 
     def test_unavailable_when_device_not_found(self):
         device = _make_device(device_id="device_1")
         coordinator = _make_coordinator([], last_update_success=True)
-        sensor = AndersenEvChargeStatusSensor(coordinator, device, "charge_power", "Charge Power", "chargePower")
+        sensor = AndersenEvChargeStatusSensor(coordinator, device, "charge_power", "chargePower")
 
         assert sensor.available is False
 
@@ -611,7 +643,6 @@ class TestChargeStatusSensorNativeValue:
             coordinator,
             device,
             "charge_power",
-            "Charge Power",
             "chargePower",
             device_class=SensorDeviceClass.POWER,
         )
@@ -625,7 +656,6 @@ class TestChargeStatusSensorNativeValue:
             coordinator,
             device,
             "charge_power",
-            "Charge Power",
             "chargePower",
             device_class=SensorDeviceClass.POWER,
         )
@@ -639,7 +669,6 @@ class TestChargeStatusSensorNativeValue:
             coordinator,
             device,
             "charge_power",
-            "Charge Power",
             "chargePower",
             device_class=SensorDeviceClass.POWER,
         )
@@ -653,7 +682,6 @@ class TestChargeStatusSensorNativeValue:
             coordinator,
             device,
             "charge_power",
-            "Charge Power",
             "chargePower",
             device_class=SensorDeviceClass.POWER,
         )
@@ -667,7 +695,6 @@ class TestChargeStatusSensorNativeValue:
             coordinator,
             device,
             "session_start",
-            "Session Start Time",
             "start",
             device_class=SensorDeviceClass.TIMESTAMP,
         )
@@ -685,7 +712,6 @@ class TestChargeStatusSensorNativeValue:
             coordinator,
             device,
             "session_start",
-            "Session Start Time",
             "start",
             device_class=SensorDeviceClass.TIMESTAMP,
         )
@@ -700,7 +726,6 @@ class TestChargeStatusSensorNativeValue:
             coordinator,
             original_device,
             "charge_power",
-            "Charge Power",
             "chargePower",
             device_class=SensorDeviceClass.POWER,
         )
@@ -716,7 +741,7 @@ class TestChargeStatusSensorAsyncUpdate:
     async def test_refreshes_from_api(self):
         device = _make_device()
         coordinator = _make_coordinator([device])
-        sensor = AndersenEvChargeStatusSensor(coordinator, device, "charge_power", "Charge Power", "chargePower")
+        sensor = AndersenEvChargeStatusSensor(coordinator, device, "charge_power", "chargePower")
 
         await sensor.async_update()
 
@@ -727,7 +752,7 @@ class TestChargeStatusSensorAsyncUpdate:
         device = _make_device()
         device.get_detailed_device_status = AsyncMock(side_effect=RuntimeError("boom"))
         coordinator = _make_coordinator([device])
-        sensor = AndersenEvChargeStatusSensor(coordinator, device, "charge_power", "Charge Power", "chargePower")
+        sensor = AndersenEvChargeStatusSensor(coordinator, device, "charge_power", "chargePower")
 
         await sensor.async_update()
 
@@ -739,7 +764,7 @@ class TestLiveSensorUpdateModelFromDeviceStatus:
         device = _make_device(model_name="Andersen A3")
         coordinator = _make_coordinator([device])
 
-        sensor = AndersenEvLiveSensor(coordinator, device, "sys_grid_power", "System Grid Power", "sysGridPower")
+        sensor = AndersenEvLiveSensor(coordinator, device, "sys_grid_power", "sysGridPower")
 
         assert sensor._attr_device_info["model"] == "Andersen A3"
 
@@ -747,7 +772,7 @@ class TestLiveSensorUpdateModelFromDeviceStatus:
         device = _make_device(last_status={"sysProductName": "Andersen A2 Pro"})
         coordinator = _make_coordinator([device])
 
-        sensor = AndersenEvLiveSensor(coordinator, device, "sys_grid_power", "System Grid Power", "sysGridPower")
+        sensor = AndersenEvLiveSensor(coordinator, device, "sys_grid_power", "sysGridPower")
 
         assert sensor._attr_device_info["model"] == "Andersen A2 Pro"
 
@@ -755,7 +780,7 @@ class TestLiveSensorUpdateModelFromDeviceStatus:
         device = _make_device(last_status={"sysProductId": "A2"})
         coordinator = _make_coordinator([device])
 
-        sensor = AndersenEvLiveSensor(coordinator, device, "sys_grid_power", "System Grid Power", "sysGridPower")
+        sensor = AndersenEvLiveSensor(coordinator, device, "sys_grid_power", "sysGridPower")
 
         assert sensor._attr_device_info["model"] == "A2"
 
@@ -763,7 +788,7 @@ class TestLiveSensorUpdateModelFromDeviceStatus:
         device = _make_device(last_status={"sysHwVersion": "1.5"})
         coordinator = _make_coordinator([device])
 
-        sensor = AndersenEvLiveSensor(coordinator, device, "sys_grid_power", "System Grid Power", "sysGridPower")
+        sensor = AndersenEvLiveSensor(coordinator, device, "sys_grid_power", "sysGridPower")
 
         assert sensor._attr_device_info["model"] == "A2 (HW: 1.5)"
 
@@ -771,7 +796,7 @@ class TestLiveSensorUpdateModelFromDeviceStatus:
         device = _make_device(last_status=None)
         coordinator = _make_coordinator([device])
 
-        sensor = AndersenEvLiveSensor(coordinator, device, "sys_grid_power", "System Grid Power", "sysGridPower")
+        sensor = AndersenEvLiveSensor(coordinator, device, "sys_grid_power", "sysGridPower")
 
         assert sensor._attr_device_info["model"] == "A2"
 
@@ -787,18 +812,59 @@ class TestLiveSensorInit:
             coordinator,
             device,
             "sys_grid_power",
-            "System Grid Power",
             "sysGridPower",
             device_class=SensorDeviceClass.POWER,
             state_class=SensorStateClass.MEASUREMENT,
             unit=UnitOfPower.KILO_WATT,
-            icon="mdi:transmission-tower",
         )
 
         assert sensor._attr_device_class == SensorDeviceClass.POWER
         assert sensor._attr_state_class == SensorStateClass.MEASUREMENT
         assert sensor._attr_native_unit_of_measurement == UnitOfPower.KILO_WATT
-        assert sensor._attr_icon == "mdi:transmission-tower"
+
+    def test_entity_category_set_when_provided(self):
+        device = _make_device()
+        coordinator = _make_coordinator([device])
+
+        sensor = AndersenEvLiveSensor(
+            coordinator,
+            device,
+            "sys_fault_code",
+            "sysFaultCode",
+            entity_category=EntityCategory.DIAGNOSTIC,
+        )
+
+        assert sensor.entity_category == EntityCategory.DIAGNOSTIC
+
+    def test_entity_category_none_by_default(self):
+        device = _make_device()
+        coordinator = _make_coordinator([device])
+
+        sensor = AndersenEvLiveSensor(coordinator, device, "sys_grid_power", "sysGridPower")
+
+        assert sensor.entity_category is None
+
+    def test_enabled_default_true_by_default(self):
+        device = _make_device()
+        coordinator = _make_coordinator([device])
+
+        sensor = AndersenEvLiveSensor(coordinator, device, "sys_grid_power", "sysGridPower")
+
+        assert sensor.entity_registry_enabled_default is True
+
+    def test_enabled_default_false_when_provided(self):
+        device = _make_device()
+        coordinator = _make_coordinator([device])
+
+        sensor = AndersenEvLiveSensor(
+            coordinator,
+            device,
+            "sys_grid_energy_delta",
+            "sysGridEnergyDelta",
+            enabled_default=False,
+        )
+
+        assert sensor.entity_registry_enabled_default is False
 
 
 class TestLiveSensorAvailable:
@@ -807,28 +873,28 @@ class TestLiveSensorAvailable:
     def test_available_when_data_key_present(self):
         device = _make_device(last_status={"sysGridPower": 1.2}, status_available=True)
         coordinator = _make_coordinator([device], last_update_success=True)
-        sensor = AndersenEvLiveSensor(coordinator, device, "sys_grid_power", "System Grid Power", "sysGridPower")
+        sensor = AndersenEvLiveSensor(coordinator, device, "sys_grid_power", "sysGridPower")
 
         assert sensor.available is True
 
     def test_unavailable_when_data_key_missing(self):
         device = _make_device(last_status={"other": True}, status_available=True)
         coordinator = _make_coordinator([device], last_update_success=True)
-        sensor = AndersenEvLiveSensor(coordinator, device, "sys_grid_power", "System Grid Power", "sysGridPower")
+        sensor = AndersenEvLiveSensor(coordinator, device, "sys_grid_power", "sysGridPower")
 
         assert sensor.available is False
 
     def test_unavailable_when_no_status(self):
         device = _make_device(last_status=None, status_available=True)
         coordinator = _make_coordinator([device], last_update_success=True)
-        sensor = AndersenEvLiveSensor(coordinator, device, "sys_grid_power", "System Grid Power", "sysGridPower")
+        sensor = AndersenEvLiveSensor(coordinator, device, "sys_grid_power", "sysGridPower")
 
         assert sensor.available is False
 
     def test_unavailable_when_device_not_found(self):
         device = _make_device(device_id="device_1")
         coordinator = _make_coordinator([], last_update_success=True)
-        sensor = AndersenEvLiveSensor(coordinator, device, "sys_grid_power", "System Grid Power", "sysGridPower")
+        sensor = AndersenEvLiveSensor(coordinator, device, "sys_grid_power", "sysGridPower")
 
         assert sensor.available is False
 
@@ -839,21 +905,21 @@ class TestLiveSensorNativeValue:
     def test_returns_value_from_last_status(self):
         device = _make_device(last_status={"sysGridPower": 1.5})
         coordinator = _make_coordinator([device])
-        sensor = AndersenEvLiveSensor(coordinator, device, "sys_grid_power", "System Grid Power", "sysGridPower")
+        sensor = AndersenEvLiveSensor(coordinator, device, "sys_grid_power", "sysGridPower")
 
         assert sensor.native_value == 1.5
 
     def test_returns_none_when_data_key_missing(self):
         device = _make_device(last_status={"other": True})
         coordinator = _make_coordinator([device])
-        sensor = AndersenEvLiveSensor(coordinator, device, "sys_grid_power", "System Grid Power", "sysGridPower")
+        sensor = AndersenEvLiveSensor(coordinator, device, "sys_grid_power", "sysGridPower")
 
         assert sensor.native_value is None
 
     def test_returns_none_when_no_status(self):
         device = _make_device(last_status=None)
         coordinator = _make_coordinator([device])
-        sensor = AndersenEvLiveSensor(coordinator, device, "sys_grid_power", "System Grid Power", "sysGridPower")
+        sensor = AndersenEvLiveSensor(coordinator, device, "sys_grid_power", "sysGridPower")
 
         assert sensor.native_value is None
 
@@ -861,7 +927,7 @@ class TestLiveSensorNativeValue:
         device = _make_device(last_status={"lastSeen": "2024-02-19T10:30:00Z"})
         coordinator = _make_coordinator([device])
         sensor = AndersenEvLiveSensor(
-            coordinator, device, "last_seen", "Last Seen", "lastSeen", device_class=SensorDeviceClass.TIMESTAMP
+            coordinator, device, "last_seen", "lastSeen", device_class=SensorDeviceClass.TIMESTAMP
         )
 
         value = sensor.native_value
@@ -872,7 +938,7 @@ class TestLiveSensorNativeValue:
         device = _make_device(last_status={"lastSeen": "definitely-not-a-timestamp!!"})
         coordinator = _make_coordinator([device])
         sensor = AndersenEvLiveSensor(
-            coordinator, device, "last_seen", "Last Seen", "lastSeen", device_class=SensorDeviceClass.TIMESTAMP
+            coordinator, device, "last_seen", "lastSeen", device_class=SensorDeviceClass.TIMESTAMP
         )
 
         assert sensor.native_value is None
@@ -881,9 +947,7 @@ class TestLiveSensorNativeValue:
         original_device = _make_device(device_id="device_1", last_status=None)
         updated_device = _make_device(device_id="device_1", last_status={"sysGridPower": 3.3})
         coordinator = _make_coordinator([updated_device])
-        sensor = AndersenEvLiveSensor(
-            coordinator, original_device, "sys_grid_power", "System Grid Power", "sysGridPower"
-        )
+        sensor = AndersenEvLiveSensor(coordinator, original_device, "sys_grid_power", "sysGridPower")
 
         assert sensor.native_value == 3.3
         assert sensor._device is updated_device
@@ -896,7 +960,7 @@ class TestLiveSensorAsyncUpdate:
     async def test_refreshes_from_api(self):
         device = _make_device()
         coordinator = _make_coordinator([device])
-        sensor = AndersenEvLiveSensor(coordinator, device, "sys_grid_power", "System Grid Power", "sysGridPower")
+        sensor = AndersenEvLiveSensor(coordinator, device, "sys_grid_power", "sysGridPower")
 
         await sensor.async_update()
 
@@ -907,9 +971,54 @@ class TestLiveSensorAsyncUpdate:
         device = _make_device()
         device.get_detailed_device_status = AsyncMock(side_effect=RuntimeError("boom"))
         coordinator = _make_coordinator([device])
-        sensor = AndersenEvLiveSensor(coordinator, device, "sys_grid_power", "System Grid Power", "sysGridPower")
+        sensor = AndersenEvLiveSensor(coordinator, device, "sys_grid_power", "sysGridPower")
 
         await sensor.async_update()
+
+
+class TestBuildEntitiesForDeviceEntityCategories:
+    """Tests locking in per-instance entity_category/enabled_default overrides."""
+
+    def _entities_by_unique_id_suffix(self, device):
+        coordinator = _make_coordinator([device])
+        entities = _build_entities_for_device(coordinator, device)
+        return {entity._attr_unique_id.removeprefix(f"{device.device_id}_"): entity for entity in entities}
+
+    def test_fault_code_sensor_is_diagnostic(self):
+        device = _make_device()
+        entities = self._entities_by_unique_id_suffix(device)
+
+        sensor = entities["sys_fault_code"]
+
+        assert sensor.entity_category == EntityCategory.DIAGNOSTIC
+        assert sensor.entity_registry_enabled_default is True
+
+    def test_grid_energy_delta_sensor_is_diagnostic_and_disabled_by_default(self):
+        device = _make_device()
+        entities = self._entities_by_unique_id_suffix(device)
+
+        sensor = entities["sys_grid_energy_delta"]
+
+        assert sensor.entity_category == EntityCategory.DIAGNOSTIC
+        assert sensor.entity_registry_enabled_default is False
+
+    def test_unrelated_live_sensor_is_uncategorized_and_enabled(self):
+        device = _make_device()
+        entities = self._entities_by_unique_id_suffix(device)
+
+        sensor = entities["sys_grid_power"]
+
+        assert sensor.entity_category is None
+        assert sensor.entity_registry_enabled_default is True
+
+    def test_unrelated_energy_sensor_is_uncategorized_and_enabled(self):
+        device = _make_device()
+        entities = self._entities_by_unique_id_suffix(device)
+
+        sensor = entities["energy"]
+
+        assert sensor.entity_category is None
+        assert sensor.entity_registry_enabled_default is True
 
 
 class TestEnergySensorUnitConstants:
@@ -919,7 +1028,7 @@ class TestEnergySensorUnitConstants:
         device = _make_device()
         coordinator = _make_coordinator([device])
 
-        sensor = AndersenEvEnergySensor(coordinator, device, "energy", "Total Energy", "chargeEnergyTotal")
+        sensor = AndersenEvEnergySensor(coordinator, device, "energy", "chargeEnergyTotal")
 
         assert sensor._attr_native_unit_of_measurement == UnitOfEnergy.KILO_WATT_HOUR
         assert sensor._attr_device_class == SensorDeviceClass.ENERGY

@@ -10,6 +10,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 from andersen_ev import (
     PLATFORMS,
     AndersenEvCoordinator,
+    _make_stale_device_listener,
     async_setup_entry,
     async_unload_entry,
 )
@@ -272,8 +273,94 @@ class TestAsyncRequestRefresh:
         mock_parent_refresh.assert_awaited_once()
 
 
+class TestMakeStaleDeviceListener:
+    """Tests for _make_stale_device_listener() (the stale-devices rule)."""
+
+    def test_removed_device_is_removed_from_registry(self):
+        device_a = _make_device(device_id="device_1")
+        device_b = _make_device(device_id="device_2")
+        coordinator = _make_coordinator()
+        coordinator.data = [device_a, device_b]
+        hass = MagicMock()
+        mock_registry = MagicMock()
+        mock_registry_entry = MagicMock()
+        mock_registry_entry.id = "registry_entry_1"
+        mock_registry.async_get_device.return_value = mock_registry_entry
+
+        with patch("andersen_ev.dr.async_get", return_value=mock_registry):
+            listener = _make_stale_device_listener(hass, coordinator)
+            coordinator.data = [device_a]
+            listener()
+
+        mock_registry.async_get_device.assert_called_once_with(identifiers={(DOMAIN, "device_2")})
+        mock_registry.async_remove_device.assert_called_once_with("registry_entry_1")
+
+    def test_no_change_removes_nothing(self):
+        device_a = _make_device(device_id="device_1")
+        coordinator = _make_coordinator()
+        coordinator.data = [device_a]
+        hass = MagicMock()
+        mock_registry = MagicMock()
+
+        with patch("andersen_ev.dr.async_get", return_value=mock_registry):
+            listener = _make_stale_device_listener(hass, coordinator)
+            listener()
+
+        mock_registry.async_remove_device.assert_not_called()
+
+    def test_device_missing_from_registry_skips_removal(self):
+        device_a = _make_device(device_id="device_1")
+        coordinator = _make_coordinator()
+        coordinator.data = [device_a]
+        hass = MagicMock()
+        mock_registry = MagicMock()
+        mock_registry.async_get_device.return_value = None
+
+        with patch("andersen_ev.dr.async_get", return_value=mock_registry):
+            listener = _make_stale_device_listener(hass, coordinator)
+            coordinator.data = []
+            listener()
+
+        mock_registry.async_remove_device.assert_not_called()
+
+    def test_new_device_appearing_is_tracked_without_removal(self):
+        device_a = _make_device(device_id="device_1")
+        device_b = _make_device(device_id="device_2")
+        coordinator = _make_coordinator()
+        coordinator.data = [device_a]
+        hass = MagicMock()
+        mock_registry = MagicMock()
+
+        with patch("andersen_ev.dr.async_get", return_value=mock_registry):
+            listener = _make_stale_device_listener(hass, coordinator)
+            coordinator.data = [device_a, device_b]
+            listener()
+
+            # A subsequent refresh with no further changes should still remove nothing.
+            listener()
+
+        mock_registry.async_remove_device.assert_not_called()
+
+
 class TestAsyncSetupEntry:
     """Tests for async_setup_entry()."""
+
+    @pytest.mark.asyncio
+    async def test_registers_stale_device_cleanup_listener(self):
+        hass = _make_hass()
+        entry = _make_entry()
+        mock_coordinator = MagicMock()
+        mock_coordinator.async_config_entry_first_refresh = AsyncMock()
+        mock_coordinator.data = []
+
+        with (
+            patch("andersen_ev.KonnectClient"),
+            patch("andersen_ev.AndersenEvCoordinator", return_value=mock_coordinator),
+        ):
+            await async_setup_entry(hass, entry)
+
+        mock_coordinator.async_add_listener.assert_called_once()
+        entry.async_on_unload.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_creates_client_and_coordinator_and_stores_runtime_data(self):

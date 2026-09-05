@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers.entity import EntityCategory
 
 from andersen_ev.switch import AndersenEvScheduleSwitch, async_setup_entry
 
@@ -271,6 +272,14 @@ class TestInit:
         assert switch._attr_icon == "mdi:calendar-clock"
         assert switch._attr_device_info["name"] == "My Charger (device_1)"
         assert switch._attr_has_entity_name is True
+
+    def test_entity_category_is_config(self):
+        device = _make_device()
+        coordinator = _make_coordinator([device])
+
+        switch = _make_switch(coordinator, device)
+
+        assert switch.entity_category == EntityCategory.CONFIG
 
     def test_extra_state_attributes(self):
         device = _make_device()

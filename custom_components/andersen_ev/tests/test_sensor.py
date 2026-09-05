@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from homeassistant.components.sensor import SensorDeviceClass, SensorStateClass
 from homeassistant.const import UnitOfEnergy, UnitOfPower
+from homeassistant.helpers.entity import EntityCategory
 
 from andersen_ev.sensor import (
     AndersenEvChargeStatusSensor,
@@ -12,6 +13,7 @@ from andersen_ev.sensor import (
     AndersenEvCostSensor,
     AndersenEvEnergySensor,
     AndersenEvLiveSensor,
+    _build_entities_for_device,
     async_setup_entry,
 )
 
@@ -868,6 +870,52 @@ class TestLiveSensorInit:
         assert sensor._attr_native_unit_of_measurement == UnitOfPower.KILO_WATT
         assert sensor._attr_icon == "mdi:transmission-tower"
 
+    def test_entity_category_set_when_provided(self):
+        device = _make_device()
+        coordinator = _make_coordinator([device])
+
+        sensor = AndersenEvLiveSensor(
+            coordinator,
+            device,
+            "sys_fault_code",
+            "Fault Code",
+            "sysFaultCode",
+            entity_category=EntityCategory.DIAGNOSTIC,
+        )
+
+        assert sensor.entity_category == EntityCategory.DIAGNOSTIC
+
+    def test_entity_category_none_by_default(self):
+        device = _make_device()
+        coordinator = _make_coordinator([device])
+
+        sensor = AndersenEvLiveSensor(coordinator, device, "sys_grid_power", "System Grid Power", "sysGridPower")
+
+        assert sensor.entity_category is None
+
+    def test_enabled_default_true_by_default(self):
+        device = _make_device()
+        coordinator = _make_coordinator([device])
+
+        sensor = AndersenEvLiveSensor(coordinator, device, "sys_grid_power", "System Grid Power", "sysGridPower")
+
+        assert sensor.entity_registry_enabled_default is True
+
+    def test_enabled_default_false_when_provided(self):
+        device = _make_device()
+        coordinator = _make_coordinator([device])
+
+        sensor = AndersenEvLiveSensor(
+            coordinator,
+            device,
+            "sys_grid_energy_delta",
+            "System Grid Energy Delta",
+            "sysGridEnergyDelta",
+            enabled_default=False,
+        )
+
+        assert sensor.entity_registry_enabled_default is False
+
 
 class TestLiveSensorAvailable:
     """Tests for AndersenEvLiveSensor.available."""
@@ -978,6 +1026,51 @@ class TestLiveSensorAsyncUpdate:
         sensor = AndersenEvLiveSensor(coordinator, device, "sys_grid_power", "System Grid Power", "sysGridPower")
 
         await sensor.async_update()
+
+
+class TestBuildEntitiesForDeviceEntityCategories:
+    """Tests locking in per-instance entity_category/enabled_default overrides."""
+
+    def _entities_by_unique_id_suffix(self, device):
+        coordinator = _make_coordinator([device])
+        entities = _build_entities_for_device(coordinator, device)
+        return {entity._attr_unique_id.removeprefix(f"{device.device_id}_"): entity for entity in entities}
+
+    def test_fault_code_sensor_is_diagnostic(self):
+        device = _make_device()
+        entities = self._entities_by_unique_id_suffix(device)
+
+        sensor = entities["sys_fault_code"]
+
+        assert sensor.entity_category == EntityCategory.DIAGNOSTIC
+        assert sensor.entity_registry_enabled_default is True
+
+    def test_grid_energy_delta_sensor_is_diagnostic_and_disabled_by_default(self):
+        device = _make_device()
+        entities = self._entities_by_unique_id_suffix(device)
+
+        sensor = entities["sys_grid_energy_delta"]
+
+        assert sensor.entity_category == EntityCategory.DIAGNOSTIC
+        assert sensor.entity_registry_enabled_default is False
+
+    def test_unrelated_live_sensor_is_uncategorized_and_enabled(self):
+        device = _make_device()
+        entities = self._entities_by_unique_id_suffix(device)
+
+        sensor = entities["sys_grid_power"]
+
+        assert sensor.entity_category is None
+        assert sensor.entity_registry_enabled_default is True
+
+    def test_unrelated_energy_sensor_is_uncategorized_and_enabled(self):
+        device = _make_device()
+        entities = self._entities_by_unique_id_suffix(device)
+
+        sensor = entities["energy"]
+
+        assert sensor.entity_category is None
+        assert sensor.entity_registry_enabled_default is True
 
 
 class TestEnergySensorUnitConstants:

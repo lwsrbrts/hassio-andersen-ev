@@ -18,7 +18,7 @@ from homeassistant.const import (
     UnitOfTemperature,
 )
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.entity import DeviceInfo
+from homeassistant.helpers.entity import DeviceInfo, EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -154,6 +154,7 @@ def _build_entities_for_device(coordinator: AndersenEvCoordinator, device) -> li
             None,
             None,
             "mdi:exclamation",
+            entity_category=EntityCategory.DIAGNOSTIC,
         )
     )
     entities.append(
@@ -167,6 +168,8 @@ def _build_entities_for_device(coordinator: AndersenEvCoordinator, device) -> li
             SensorStateClass.TOTAL,
             UnitOfEnergy.KILO_WATT_HOUR,
             "mdi:transmission-tower",
+            entity_category=EntityCategory.DIAGNOSTIC,
+            enabled_default=False,
         )
     )
 
@@ -652,6 +655,8 @@ class AndersenEvLiveSensor(AndersenEvDeviceInfoMixin, CoordinatorEntity, SensorE
         state_class=None,
         unit=None,
         icon=None,
+        entity_category: EntityCategory | None = None,
+        enabled_default: bool = True,
     ) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator)
@@ -675,6 +680,9 @@ class AndersenEvLiveSensor(AndersenEvDeviceInfoMixin, CoordinatorEntity, SensorE
             self._attr_native_unit_of_measurement = unit
         if icon:
             self._attr_icon = icon
+        if entity_category is not None:
+            self._attr_entity_category = entity_category
+        self._attr_entity_registry_enabled_default = enabled_default
         self._update_model_from_device_status()
 
     @property

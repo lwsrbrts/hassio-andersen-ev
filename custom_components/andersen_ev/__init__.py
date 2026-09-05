@@ -10,6 +10,7 @@ from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
 from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import (
@@ -22,7 +23,7 @@ from .const import (
     SERVICE_RCM_RESET,
 )
 from .konnect.client import KonnectClient
-from .konnect.exceptions import AndersenAuthError, AndersenError
+from .konnect.exceptions import AndersenApiError, AndersenAuthError, AndersenError
 
 PLATFORMS = [Platform.LOCK, Platform.SENSOR, Platform.SWITCH]
 
@@ -215,11 +216,26 @@ class AndersenEvCoordinator(DataUpdateCoordinator):
             devices = await self.client.getDevices()
         except AndersenAuthError as err:
             raise ConfigEntryAuthFailed("Authentication failed - please re-enter credentials") from err
+        except AndersenApiError as err:
+            ir.async_create_issue(
+                self.hass,
+                DOMAIN,
+                "api_shape_changed",
+                is_fixable=False,
+                severity=ir.IssueSeverity.ERROR,
+                translation_key="api_shape_changed",
+            )
+            if self.devices:
+                _LOGGER.warning("API error, using cached device data: %s", err)
+                return self.devices
+            raise UpdateFailed(f"Error communicating with Andersen EV API: {err}") from err
         except AndersenError as err:
             if self.devices:
                 _LOGGER.warning("API error, using cached device data: %s", err)
                 return self.devices
             raise UpdateFailed(f"Error communicating with Andersen EV API: {err}") from err
+
+        ir.async_delete_issue(self.hass, DOMAIN, "api_shape_changed")
 
         if not devices:
             if self.devices:

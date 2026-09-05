@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from homeassistant.const import Platform
 from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
+from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from andersen_ev import (
@@ -22,15 +23,16 @@ from andersen_ev.const import (
     SERVICE_GET_DEVICE_STATUS,
     SERVICE_RCM_RESET,
 )
-from andersen_ev.konnect.exceptions import AndersenAuthError, AndersenError
+from andersen_ev.konnect.exceptions import AndersenApiError, AndersenAuthError, AndersenError
 
 
-def _make_coordinator(client=None):
+def _make_coordinator(client=None, hass=None):
     """Build an AndersenEvCoordinator without running DataUpdateCoordinator.__init__."""
     coordinator = AndersenEvCoordinator.__new__(AndersenEvCoordinator)
     coordinator.client = client or MagicMock()
     coordinator.devices = []
     coordinator._device_availability = {}
+    coordinator.hass = hass if hass is not None else MagicMock()
     return coordinator
 
 
@@ -105,6 +107,18 @@ class TestAsyncUpdateData:
         assert coordinator._device_availability[device.device_id] is True
 
     @pytest.mark.asyncio
+    async def test_successful_update_clears_api_shape_repair_issue(self):
+        device = _make_device()
+        client = MagicMock()
+        client.getDevices = AsyncMock(return_value=[device])
+        coordinator = _make_coordinator(client)
+
+        with patch("andersen_ev.ir.async_delete_issue") as mock_delete_issue:
+            await coordinator._async_update_data()
+
+        mock_delete_issue.assert_called_once_with(coordinator.hass, DOMAIN, "api_shape_changed")
+
+    @pytest.mark.asyncio
     async def test_auth_error_raises_config_entry_auth_failed(self):
         client = MagicMock()
         client.getDevices = AsyncMock(side_effect=AndersenAuthError("bad credentials"))
@@ -133,6 +147,41 @@ class TestAsyncUpdateData:
 
         with pytest.raises(UpdateFailed):
             await coordinator._async_update_data()
+
+    @pytest.mark.asyncio
+    async def test_api_shape_error_creates_repair_issue_and_raises_update_failed(self):
+        client = MagicMock()
+        client.getDevices = AsyncMock(side_effect=AndersenApiError("missing 'devices' key"))
+        coordinator = _make_coordinator(client)
+
+        with (
+            patch("andersen_ev.ir.async_create_issue") as mock_create_issue,
+            pytest.raises(UpdateFailed),
+        ):
+            await coordinator._async_update_data()
+
+        mock_create_issue.assert_called_once()
+        args, kwargs = mock_create_issue.call_args
+        assert args[0] is coordinator.hass
+        assert args[1] == DOMAIN
+        assert args[2] == "api_shape_changed"
+        assert kwargs["translation_key"] == "api_shape_changed"
+        assert kwargs["is_fixable"] is False
+        assert kwargs["severity"] == ir.IssueSeverity.ERROR
+
+    @pytest.mark.asyncio
+    async def test_api_shape_error_with_cache_creates_issue_and_returns_cached_devices(self):
+        cached_device = _make_device()
+        client = MagicMock()
+        client.getDevices = AsyncMock(side_effect=AndersenApiError("missing 'devices' key"))
+        coordinator = _make_coordinator(client)
+        coordinator.devices = [cached_device]
+
+        with patch("andersen_ev.ir.async_create_issue") as mock_create_issue:
+            result = await coordinator._async_update_data()
+
+        assert result == [cached_device]
+        mock_create_issue.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_empty_devices_with_cache_returns_cached_devices(self):

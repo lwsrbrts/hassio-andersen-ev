@@ -115,6 +115,39 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # pylint: disable=a
             errors=errors,
         )
 
+    async def async_step_reconfigure(self, user_input=None) -> FlowResult:
+        """Handle reconfiguration - update the password without removing the integration."""
+        errors = {}
+        reconfigure_entry = self._get_reconfigure_entry()
+        if user_input is not None:
+            try:
+                await validate_input(
+                    self.hass,
+                    {
+                        CONF_EMAIL: reconfigure_entry.data[CONF_EMAIL],
+                        CONF_PASSWORD: user_input[CONF_PASSWORD],
+                    },
+                )
+            except CannotConnect:
+                errors["base"] = "cannot_connect"
+            except InvalidAuth:
+                errors["base"] = "invalid_auth"
+            except Exception:  # pylint: disable=broad-except
+                _LOGGER.exception("Unexpected exception during reconfigure")
+                errors["base"] = "unknown"
+            else:
+                return self.async_update_reload_and_abort(
+                    reconfigure_entry,
+                    data_updates={CONF_PASSWORD: user_input[CONF_PASSWORD]},
+                )
+
+        return self.async_show_form(
+            step_id="reconfigure",
+            data_schema=vol.Schema({vol.Required(CONF_PASSWORD): str}),
+            description_placeholders={"email": reconfigure_entry.data[CONF_EMAIL]},
+            errors=errors,
+        )
+
 
 class CannotConnect(HomeAssistantError):
     """Error to indicate we cannot connect."""

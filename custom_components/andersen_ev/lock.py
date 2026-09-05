@@ -50,13 +50,13 @@ class AndersenEvLock(AndersenEvDeviceInfoMixin, CoordinatorEntity, LockEntity): 
     """Representation of an Andersen EV charging lock."""
 
     _attr_has_entity_name = True
+    _attr_translation_key = "lock"
 
     def __init__(self, coordinator: AndersenEvCoordinator, device) -> None:
         """Initialize the lock."""
         super().__init__(coordinator)
         self._device = device
         self._attr_unique_id = f"{device.device_id}_lock"
-        self._attr_name = "Lock"
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, device.device_id)},
             name=f"{device.friendly_name} ({device.device_id})",
@@ -111,13 +111,21 @@ class AndersenEvLock(AndersenEvDeviceInfoMixin, CoordinatorEntity, LockEntity): 
     async def async_lock(self, **kwargs: Any) -> None:
         """Lock the charging station (disable charging)."""
         if not await self._device.disable():
-            raise HomeAssistantError("Failed to lock the charger")
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="lock_failed",
+                translation_placeholders={"device_name": self._device.friendly_name},
+            )
         _LOGGER.debug("Locking device %s (disabling charging)", self._device.friendly_name)
         await self.coordinator.async_request_refresh()
 
     async def async_unlock(self, **kwargs: Any) -> None:
         """Unlock the charging station (enable charging)."""
         if not await self._device.enable():
-            raise HomeAssistantError("Failed to unlock the charger")
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="unlock_failed",
+                translation_placeholders={"device_name": self._device.friendly_name},
+            )
         _LOGGER.debug("Unlocking device %s (enabling charging)", self._device.friendly_name)
         await self.coordinator.async_request_refresh()

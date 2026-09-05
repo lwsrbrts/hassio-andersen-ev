@@ -117,7 +117,8 @@ class AndersenEvScheduleSwitch(AndersenEvDeviceInfoMixin, CoordinatorEntity, Swi
         self._device = device
         self._schedule_index = index
         self._schedule_name = schedule_name
-        self._attr_name = f"Schedule {index + 1}"
+        self._attr_translation_key = "schedule"
+        self._attr_translation_placeholders = {"index": str(index + 1)}
         self._attr_unique_id = f"{device.device_id}_schedule_{index}"
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, device.device_id)},
@@ -126,7 +127,6 @@ class AndersenEvScheduleSwitch(AndersenEvDeviceInfoMixin, CoordinatorEntity, Swi
             model="A2",
             serial_number=f"{device.device_id}",
         )
-        self._attr_icon = "mdi:calendar-clock"
         self._update_model_from_device_status()
 
     @property
@@ -190,7 +190,11 @@ class AndersenEvScheduleSwitch(AndersenEvDeviceInfoMixin, CoordinatorEntity, Swi
                     or "deviceStatus" not in device_info
                     or "scheduleSlotsArray" not in device_info["deviceStatus"]
                 ):
-                    raise HomeAssistantError("Failed to retrieve schedule data")
+                    raise HomeAssistantError(
+                        translation_domain=DOMAIN,
+                        translation_key="schedule_data_unavailable",
+                        translation_placeholders={"device_name": self._device.friendly_name},
+                    )
                 schedule_slots = copy.deepcopy(device_info["deviceStatus"]["scheduleSlotsArray"])
             else:
                 # Use the data from the coordinator
@@ -227,12 +231,27 @@ class AndersenEvScheduleSwitch(AndersenEvDeviceInfoMixin, CoordinatorEntity, Swi
                     # Request a refresh of the coordinator data to update all entities
                     await self.coordinator.async_request_refresh()
                 else:
-                    raise HomeAssistantError(f"Failed to update schedule for {self._device.friendly_name}")
+                    raise HomeAssistantError(
+                        translation_domain=DOMAIN,
+                        translation_key="schedule_update_failed",
+                        translation_placeholders={"device_name": self._device.friendly_name},
+                    )
             else:
-                raise HomeAssistantError(f"Schedule index {self._schedule_index} out of range")
+                raise HomeAssistantError(
+                    translation_domain=DOMAIN,
+                    translation_key="schedule_index_out_of_range",
+                    translation_placeholders={
+                        "index": str(self._schedule_index),
+                        "device_name": self._device.friendly_name,
+                    },
+                )
 
         except Exception as err:  # pylint: disable=broad-exception-caught
-            raise HomeAssistantError(f"Failed to update schedule: {err}") from err
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="schedule_update_error",
+                translation_placeholders={"device_name": self._device.friendly_name, "error": str(err)},
+            ) from err
 
     async def _send_set_schedules_mutation(self, schedule_slots, enabled=None) -> bool:
         """Send the setSchedules mutation to the Andersen EV API."""

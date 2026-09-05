@@ -80,7 +80,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: AndersenEvConfigEntry) -
                 await coordinator.async_request_refresh()
                 break
         else:
-            raise HomeAssistantError(f"Device {device_id} not found")
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="device_not_found",
+                translation_placeholders={"device_id": device_id},
+            )
 
     async def get_device_info(call: ServiceCall) -> dict:
         """Get detailed information for a device and return it to the UI."""
@@ -93,9 +97,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: AndersenEvConfigEntry) -
                 if device_info:
                     # Return the device info as a response that will be shown in the UI
                     return device_info
-                raise HomeAssistantError("Failed to retrieve device information")
+                raise HomeAssistantError(
+                    translation_domain=DOMAIN,
+                    translation_key="get_device_info_failed",
+                    translation_placeholders={"device_id": device_id},
+                )
 
-        raise HomeAssistantError(f"Device {device_id} not found")
+        raise HomeAssistantError(
+            translation_domain=DOMAIN,
+            translation_key="device_not_found",
+            translation_placeholders={"device_id": device_id},
+        )
 
     async def get_device_status(call: ServiceCall) -> dict:
         """Get detailed status for a device and return it to the UI."""
@@ -107,9 +119,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: AndersenEvConfigEntry) -
                 device_status = await device.get_detailed_device_status()
                 if device_status:
                     return device_status
-                raise HomeAssistantError("Failed to retrieve device status")
+                raise HomeAssistantError(
+                    translation_domain=DOMAIN,
+                    translation_key="get_device_status_failed",
+                    translation_placeholders={"device_id": device_id},
+                )
 
-        raise HomeAssistantError(f"Device {device_id} not found")
+        raise HomeAssistantError(
+            translation_domain=DOMAIN,
+            translation_key="device_not_found",
+            translation_placeholders={"device_id": device_id},
+        )
 
     async def reset_rcm(call: ServiceCall) -> None:
         """Reset RCM fault for a device."""
@@ -122,7 +142,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: AndersenEvConfigEntry) -
                 await coordinator.async_request_refresh()
                 break
         else:
-            raise HomeAssistantError(f"Device {device_id} not found")
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="device_not_found",
+                translation_placeholders={"device_id": device_id},
+            )
 
     # Register services using simpler schema
     service_schema = vol.Schema({vol.Required(ATTR_DEVICE_ID): str})

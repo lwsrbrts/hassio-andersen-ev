@@ -67,9 +67,7 @@ def _build_entities_for_device(coordinator: AndersenEvCoordinator, device) -> li
             coordinator,
             device,
             "energy",
-            "Total Energy",
             "chargeEnergyTotal",
-            "mdi:lightning-bolt-circle",
         )
     )
     entities.append(
@@ -77,9 +75,7 @@ def _build_entities_for_device(coordinator: AndersenEvCoordinator, device) -> li
             coordinator,
             device,
             "grid_energy",
-            "Grid Energy",
             "gridEnergyTotal",
-            "mdi:transmission-tower",
         )
     )
     entities.append(
@@ -87,9 +83,7 @@ def _build_entities_for_device(coordinator: AndersenEvCoordinator, device) -> li
             coordinator,
             device,
             "solar_energy",
-            "Solar Energy",
             "solarEnergyTotal",
-            "mdi:solar-power",
         )
     )
     entities.append(
@@ -97,9 +91,7 @@ def _build_entities_for_device(coordinator: AndersenEvCoordinator, device) -> li
             coordinator,
             device,
             "surplus_energy",
-            "Surplus Energy",
             "surplusUsedEnergyTotal",
-            "mdi:battery-plus",
         )
     )
 
@@ -109,12 +101,10 @@ def _build_entities_for_device(coordinator: AndersenEvCoordinator, device) -> li
             coordinator,
             device,
             "sys_grid_power",
-            "System Grid Power",
             "sysGridPower",
             SensorDeviceClass.POWER,
             SensorStateClass.MEASUREMENT,
             UnitOfPower.KILO_WATT,
-            "mdi:transmission-tower",
         )
     )
     entities.append(
@@ -122,12 +112,10 @@ def _build_entities_for_device(coordinator: AndersenEvCoordinator, device) -> li
             coordinator,
             device,
             "sys_temperature",
-            "System Temperature",
             "sysTemperature",
             SensorDeviceClass.TEMPERATURE,
             SensorStateClass.MEASUREMENT,
             UnitOfTemperature.CELSIUS,
-            "mdi:temperature-celsius",
         )
     )
     entities.append(
@@ -135,12 +123,10 @@ def _build_entities_for_device(coordinator: AndersenEvCoordinator, device) -> li
             coordinator,
             device,
             "sys_voltage",
-            "System Voltage",
             "sysVoltageC",
             SensorDeviceClass.VOLTAGE,
             SensorStateClass.MEASUREMENT,
             UnitOfElectricPotential.VOLT,
-            "mdi:transmission-tower",
         )
     )
     entities.append(
@@ -148,12 +134,10 @@ def _build_entities_for_device(coordinator: AndersenEvCoordinator, device) -> li
             coordinator,
             device,
             "sys_fault_code",
-            "Fault Code",
             "sysFaultCode",
             None,
             None,
             None,
-            "mdi:exclamation",
             entity_category=EntityCategory.DIAGNOSTIC,
         )
     )
@@ -162,12 +146,10 @@ def _build_entities_for_device(coordinator: AndersenEvCoordinator, device) -> li
             coordinator,
             device,
             "sys_grid_energy_delta",
-            "System Grid Energy Delta",
             "sysGridEnergyDelta",
             SensorDeviceClass.ENERGY,
             SensorStateClass.TOTAL,
             UnitOfEnergy.KILO_WATT_HOUR,
-            "mdi:transmission-tower",
             entity_category=EntityCategory.DIAGNOSTIC,
             enabled_default=False,
         )
@@ -179,9 +161,7 @@ def _build_entities_for_device(coordinator: AndersenEvCoordinator, device) -> li
             coordinator,
             device,
             "cost",
-            "Total Cost",
             "chargeCostTotal",
-            "mdi:currency-gbp",
         )
     )
     entities.append(
@@ -189,9 +169,7 @@ def _build_entities_for_device(coordinator: AndersenEvCoordinator, device) -> li
             coordinator,
             device,
             "grid_cost",
-            "Grid Cost",
             "gridCostTotal",
-            "mdi:cash-multiple",
         )
     )
     entities.append(
@@ -199,9 +177,7 @@ def _build_entities_for_device(coordinator: AndersenEvCoordinator, device) -> li
             coordinator,
             device,
             "solar_cost",
-            "Solar Cost",
             "solarCostTotal",
-            "mdi:solar-power-variant",
         )
     )
     entities.append(
@@ -209,9 +185,7 @@ def _build_entities_for_device(coordinator: AndersenEvCoordinator, device) -> li
             coordinator,
             device,
             "surplus_cost",
-            "Surplus Cost",
             "surplusUsedCostTotal",
-            "mdi:cash-plus",
         )
     )
 
@@ -224,12 +198,10 @@ def _build_entities_for_device(coordinator: AndersenEvCoordinator, device) -> li
             coordinator,
             device,
             "charge_power",
-            "Charge Power",
             "chargePower",
             SensorDeviceClass.POWER,
             SensorStateClass.MEASUREMENT,
             UnitOfPower.WATT,
-            "mdi:ev-station",
         )
     )
     entities.append(
@@ -237,12 +209,10 @@ def _build_entities_for_device(coordinator: AndersenEvCoordinator, device) -> li
             coordinator,
             device,
             "charge_power_max",
-            "Max Charge Power",
             "chargePowerMax",
             SensorDeviceClass.POWER,
             SensorStateClass.MEASUREMENT,
             UnitOfPower.KILO_WATT,
-            "mdi:speedometer",
         )
     )
     entities.append(
@@ -250,12 +220,10 @@ def _build_entities_for_device(coordinator: AndersenEvCoordinator, device) -> li
             coordinator,
             device,
             "solar_power",
-            "Solar Power",
             "solarPower",
             SensorDeviceClass.POWER,
             SensorStateClass.MEASUREMENT,
             UnitOfPower.WATT,
-            "mdi:solar-power",
         )
     )
     entities.append(
@@ -263,12 +231,10 @@ def _build_entities_for_device(coordinator: AndersenEvCoordinator, device) -> li
             coordinator,
             device,
             "grid_power",
-            "Grid Power",
             "gridPower",
             SensorDeviceClass.POWER,
             SensorStateClass.MEASUREMENT,
             UnitOfPower.WATT,
-            "mdi:transmission-tower",
         )
     )
 
@@ -278,12 +244,10 @@ def _build_entities_for_device(coordinator: AndersenEvCoordinator, device) -> li
             coordinator,
             device,
             "current_charge_energy",
-            "Current Session Energy",
             "chargeEnergyTotal",
             SensorDeviceClass.ENERGY,
             SensorStateClass.TOTAL,
             UnitOfEnergy.KILO_WATT_HOUR,
-            "mdi:car-electric",
         )
     )
     entities.append(
@@ -291,12 +255,10 @@ def _build_entities_for_device(coordinator: AndersenEvCoordinator, device) -> li
             coordinator,
             device,
             "current_solar_energy",
-            "Current Session Solar Energy",
             "solarEnergyTotal",
             SensorDeviceClass.ENERGY,
             SensorStateClass.TOTAL,
             UnitOfEnergy.KILO_WATT_HOUR,
-            "mdi:solar-power-variant",
         )
     )
     entities.append(
@@ -304,12 +266,10 @@ def _build_entities_for_device(coordinator: AndersenEvCoordinator, device) -> li
             coordinator,
             device,
             "current_grid_energy",
-            "Current Session Grid Energy",
             "gridEnergyTotal",
             SensorDeviceClass.ENERGY,
             SensorStateClass.TOTAL,
             UnitOfEnergy.KILO_WATT_HOUR,
-            "mdi:power-plug",
         )
     )
 
@@ -319,12 +279,10 @@ def _build_entities_for_device(coordinator: AndersenEvCoordinator, device) -> li
             coordinator,
             device,
             "session_start",
-            "Session Start Time",
             "start",
             SensorDeviceClass.TIMESTAMP,
             None,
             None,
-            "mdi:clock-start",
         )
     )
 
@@ -336,13 +294,13 @@ class AndersenEvBaseSensor(AndersenEvDeviceInfoMixin, CoordinatorEntity, SensorE
 
     _attr_has_entity_name = True
 
-    def __init__(self, coordinator: AndersenEvCoordinator, device, sensor_type, name_suffix, data_key=None) -> None:
+    def __init__(self, coordinator: AndersenEvCoordinator, device, sensor_type, data_key=None) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator)
         self._device = device
         self._sensor_type = sensor_type
         self._data_key = data_key
-        self._attr_name = name_suffix
+        self._attr_translation_key = sensor_type
         self._attr_unique_id = f"{device.device_id}_{sensor_type}"
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, device.device_id)},
@@ -390,13 +348,9 @@ class AndersenEvEnergySensor(AndersenEvBaseSensor):
     _attr_state_class = SensorStateClass.TOTAL_INCREASING
     _attr_native_unit_of_measurement = UnitOfEnergy.KILO_WATT_HOUR
 
-    def __init__(
-        self, coordinator: AndersenEvCoordinator, device, sensor_type, name_suffix, data_key, icon=None
-    ) -> None:
+    def __init__(self, coordinator: AndersenEvCoordinator, device, sensor_type, data_key) -> None:
         """Initialize the sensor."""
-        super().__init__(coordinator, device, sensor_type, name_suffix, data_key)
-        if icon:
-            self._attr_icon = icon
+        super().__init__(coordinator, device, sensor_type, data_key)
 
     @property
     def native_value(self) -> float | None:
@@ -414,13 +368,9 @@ class AndersenEvCostSensor(AndersenEvBaseSensor):
     # Assuming GBP - you could make this configurable
     _attr_native_unit_of_measurement = "GBP"
 
-    def __init__(
-        self, coordinator: AndersenEvCoordinator, device, sensor_type, name_suffix, data_key, icon=None
-    ) -> None:
+    def __init__(self, coordinator: AndersenEvCoordinator, device, sensor_type, data_key) -> None:
         """Initialize the sensor."""
-        super().__init__(coordinator, device, sensor_type, name_suffix, data_key)
-        if icon:
-            self._attr_icon = icon
+        super().__init__(coordinator, device, sensor_type, data_key)
 
     @property
     def native_value(self) -> float | None:
@@ -445,12 +395,12 @@ class AndersenEvConnectorSensor(AndersenEvDeviceInfoMixin, CoordinatorEntity, Se
     ]
 
     _attr_has_entity_name = True
+    _attr_translation_key = "connector"
 
-    def __init__(self, coordinator: AndersenEvCoordinator, device, icon=None) -> None:
+    def __init__(self, coordinator: AndersenEvCoordinator, device) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator)
         self._device = device
-        self._attr_name = "Connector"
         self._attr_unique_id = f"{device.device_id}_connector"
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, device.device_id)},
@@ -459,10 +409,6 @@ class AndersenEvConnectorSensor(AndersenEvDeviceInfoMixin, CoordinatorEntity, Se
             model="A2",
             serial_number=f"{device.device_id}",
         )
-        if icon:
-            self._attr_icon = icon
-        else:
-            self._attr_icon = "mdi:ev-plug-type2"
         self._update_model_from_device_status()
         self._connector_state = "unknown"
         self._last_evse_state = None
@@ -555,19 +501,17 @@ class AndersenEvChargeStatusSensor(AndersenEvDeviceInfoMixin, CoordinatorEntity,
         coordinator: AndersenEvCoordinator,
         device,
         sensor_type,
-        name_suffix,
         data_key,
         device_class=None,
         state_class=None,
         unit=None,
-        icon=None,
     ) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator)
         self._device = device
         self._sensor_type = sensor_type
         self._data_key = data_key
-        self._attr_name = name_suffix
+        self._attr_translation_key = sensor_type
         self._attr_unique_id = f"{device.device_id}_{sensor_type}"
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, device.device_id)},
@@ -582,8 +526,6 @@ class AndersenEvChargeStatusSensor(AndersenEvDeviceInfoMixin, CoordinatorEntity,
             self._attr_state_class = state_class
         if unit:
             self._attr_native_unit_of_measurement = unit
-        if icon:
-            self._attr_icon = icon
         self._update_model_from_device_status()
 
     @property
@@ -649,12 +591,10 @@ class AndersenEvLiveSensor(AndersenEvDeviceInfoMixin, CoordinatorEntity, SensorE
         coordinator: AndersenEvCoordinator,
         device,
         sensor_type,
-        name_suffix,
         data_key,
         device_class=None,
         state_class=None,
         unit=None,
-        icon=None,
         entity_category: EntityCategory | None = None,
         enabled_default: bool = True,
     ) -> None:
@@ -663,7 +603,7 @@ class AndersenEvLiveSensor(AndersenEvDeviceInfoMixin, CoordinatorEntity, SensorE
         self._device = device
         self._sensor_type = sensor_type
         self._data_key = data_key
-        self._attr_name = name_suffix
+        self._attr_translation_key = sensor_type
         self._attr_unique_id = f"{device.device_id}_{sensor_type}"
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, device.device_id)},
@@ -678,8 +618,6 @@ class AndersenEvLiveSensor(AndersenEvDeviceInfoMixin, CoordinatorEntity, SensorE
             self._attr_state_class = state_class
         if unit:
             self._attr_native_unit_of_measurement = unit
-        if icon:
-            self._attr_icon = icon
         if entity_category is not None:
             self._attr_entity_category = entity_category
         self._attr_entity_registry_enabled_default = enabled_default

@@ -261,15 +261,15 @@ class TestDynamicDevices:
 class TestInit:
     """Tests for AndersenEvScheduleSwitch.__init__()."""
 
-    def test_sets_unique_id_name_icon_and_device_info(self):
+    def test_sets_unique_id_translation_key_and_device_info(self):
         device = _make_device(device_id="device_1", friendly_name="My Charger")
         coordinator = _make_coordinator([device])
 
         switch = _make_switch(coordinator, device, index=2, schedule_name="Weekend")
 
         assert switch._attr_unique_id == "device_1_schedule_2"
-        assert switch._attr_name == "Schedule 3"
-        assert switch._attr_icon == "mdi:calendar-clock"
+        assert switch._attr_translation_key == "schedule"
+        assert switch._attr_translation_placeholders == {"index": "3"}
         assert switch._attr_device_info["name"] == "My Charger (device_1)"
         assert switch._attr_has_entity_name is True
 

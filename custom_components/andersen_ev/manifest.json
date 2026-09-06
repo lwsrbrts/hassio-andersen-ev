@@ -12,7 +12,7 @@
   "integration_type": "hub",
   "iot_class": "cloud_polling",
   "issue_tracker": "https://github.com/HA-AndersenEV/hassio-andersen-ev/issues",
-  "quality_scale": "silver",
+  "quality_scale": "gold",
   "requirements": [
     "pycognito",
     "gql[aiohttp]",

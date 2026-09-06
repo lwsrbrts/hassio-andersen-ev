@@ -69,7 +69,6 @@ jobs:
   typecheck:
     name: Typecheck
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Set up uv
@@ -89,13 +88,13 @@ jobs:
     # Stable required-status-check target: its name never changes when the
     # test matrix changes, so branch protection can require this one context.
     if: ${{ always() }}
-    needs: [lint, test, hassfest, hacs]
+    needs: [lint, test, hassfest, hacs, typecheck]
     runs-on: ubuntu-latest
     steps:
       - name: Verify required jobs succeeded
         run: |
-          if [ "${{ needs.lint.result }}" != "success" ] || [ "${{ needs.test.result }}" != "success" ] || [ "${{ needs.hassfest.result }}" != "success" ] || [ "${{ needs.hacs.result }}" != "success" ]; then
-            echo "A required job did not succeed (lint=${{ needs.lint.result }}, test=${{ needs.test.result }}, hassfest=${{ needs.hassfest.result }}, hacs=${{ needs.hacs.result }})"
+          if [ "${{ needs.lint.result }}" != "success" ] || [ "${{ needs.test.result }}" != "success" ] || [ "${{ needs.hassfest.result }}" != "success" ] || [ "${{ needs.hacs.result }}" != "success" ] || [ "${{ needs.typecheck.result }}" != "success" ]; then
+            echo "A required job did not succeed (lint=${{ needs.lint.result }}, test=${{ needs.test.result }}, hassfest=${{ needs.hassfest.result }}, hacs=${{ needs.hacs.result }}, typecheck=${{ needs.typecheck.result }})"
             exit 1
           fi
           echo "All required jobs succeeded"

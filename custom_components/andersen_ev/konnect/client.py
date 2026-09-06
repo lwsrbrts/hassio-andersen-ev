@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import logging
 import time
@@ -19,16 +21,16 @@ _LOGGER = logging.getLogger(__name__)
 
 
 class KonnectClient:
-    email = None
-    username = None
-    password = None
+    email: str
+    username: str | None = None
+    password: str
 
-    token = None
-    tokenType = None
-    tokenExpiresIn = None
-    tokenExpiryTime = None  # New field to track token expiration time
-    refreshToken = None
-    deviceKey = None
+    token: str | None = None
+    tokenType: str | None = None
+    tokenExpiresIn: int | None = None
+    tokenExpiryTime: float | None = None  # New field to track token expiration time
+    refreshToken: str | None = None
+    deviceKey: str | None = None
 
     def __init__(self, email, password):
         self.email = email

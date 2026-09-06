@@ -1,9 +1,15 @@
 """Konnect device interface for Andersen EV chargers."""
 
+from __future__ import annotations
+
 import logging
+from typing import TYPE_CHECKING, Any
 
 from . import const
 from .graphql_client import GraphQLClient
+
+if TYPE_CHECKING:
+    from .client import KonnectClient
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -11,13 +17,13 @@ _LOGGER = logging.getLogger(__name__)
 class KonnectDevice:
     """Represents an Andersen EV charger and its GraphQL operations."""
 
-    api = None
-    device_id = None
-    friendly_name = None
-    user_lock = False
-    _last_status = None
-    model_name = None
-    _graphql_client = None  # GraphQL client instance
+    api: KonnectClient
+    device_id: str
+    friendly_name: str
+    user_lock: bool = False
+    _last_status: dict[str, Any] | None = None
+    model_name: str | None = None
+    _graphql_client: GraphQLClient | None = None  # GraphQL client instance
 
     def __init__(self, api, device_id, friendly_name, user_lock):
         """Initialize the device."""
@@ -39,6 +45,7 @@ class KonnectDevice:
     def graphql_client(self) -> GraphQLClient:
         """Lazily create the GraphQL client on first use."""
         if self._graphql_client is None:
+            assert self.api.token is not None, "graphql_client accessed before authentication"
             self._graphql_client = GraphQLClient(
                 token=self.api.token,
                 token_refresh=self._refresh_graphql_token,

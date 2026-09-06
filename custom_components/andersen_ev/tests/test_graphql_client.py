@@ -92,8 +92,8 @@ class TestGraphQLClient:
             await client.close()
 
         assert result is not None
-        call_kwargs = mock_session.execute.call_args[1]
-        assert call_kwargs.get("variable_values") is None
+        sent_request = mock_session.execute.call_args[0][0]
+        assert sent_request.variable_values is None
 
     # -- persistent session tests ------------------------------------------
 
@@ -630,8 +630,9 @@ class TestExecuteDocument:
             await client.close()
 
         assert result == data
-        call_kwargs = mock_session.execute.call_args[1]
-        assert call_kwargs["variable_values"] == {"id": "123"}
+        sent_request = mock_session.execute.call_args[0][0]
+        assert sent_request.variable_values == {"id": "123"}
+        assert sent_request.operation_name == "getDevice"
 
 
 class TestSolarOperations:

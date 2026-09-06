@@ -99,7 +99,7 @@ async def async_setup_entry(
     entry.async_on_unload(coordinator.async_add_listener(_handle_coordinator_update))
 
 
-class AndersenEvScheduleSwitch(AndersenEvDeviceInfoMixin, CoordinatorEntity, SwitchEntity):  # pylint: disable=abstract-method
+class AndersenEvScheduleSwitch(AndersenEvDeviceInfoMixin, CoordinatorEntity[AndersenEvCoordinator], SwitchEntity):  # pylint: disable=abstract-method
     """Representation of an Andersen EV charging schedule switch."""
 
     _attr_has_entity_name = True

@@ -46,7 +46,7 @@ async def async_setup_entry(
     entry.async_on_unload(coordinator.async_add_listener(_handle_coordinator_update))
 
 
-class AndersenEvLock(AndersenEvDeviceInfoMixin, CoordinatorEntity, LockEntity):  # pylint: disable=abstract-method
+class AndersenEvLock(AndersenEvDeviceInfoMixin, CoordinatorEntity[AndersenEvCoordinator], LockEntity):  # pylint: disable=abstract-method
     """Representation of an Andersen EV charging lock."""
 
     _attr_has_entity_name = True

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-from typing import ClassVar
 
 import dateutil.parser
 from homeassistant.components.sensor import (
@@ -289,7 +288,7 @@ def _build_entities_for_device(coordinator: AndersenEvCoordinator, device) -> li
     return entities
 
 
-class AndersenEvBaseSensor(AndersenEvDeviceInfoMixin, CoordinatorEntity, SensorEntity):
+class AndersenEvBaseSensor(AndersenEvDeviceInfoMixin, CoordinatorEntity[AndersenEvCoordinator], SensorEntity):
     """Base class for Andersen EV sensors."""
 
     _attr_has_entity_name = True
@@ -380,11 +379,13 @@ class AndersenEvCostSensor(AndersenEvBaseSensor):
         return None
 
 
-class AndersenEvConnectorSensor(AndersenEvDeviceInfoMixin, CoordinatorEntity, SensorEntity):
+class AndersenEvConnectorSensor(AndersenEvDeviceInfoMixin, CoordinatorEntity[AndersenEvCoordinator], SensorEntity):
     """Sensor for Andersen EV connector state."""
 
     _attr_device_class = SensorDeviceClass.ENUM
-    _attr_options: ClassVar[list[str]] = [
+    # Not ClassVar: SensorEntity itself declares _attr_options as an instance
+    # variable, so a ClassVar override here would conflict with mypy's override check.
+    _attr_options: list[str] = [  # noqa: RUF012
         "Ready",
         "Connected",
         "Charging",
@@ -491,7 +492,7 @@ class AndersenEvConnectorSensor(AndersenEvDeviceInfoMixin, CoordinatorEntity, Se
             _LOGGER.debug("Error updating connector state: %s", err)
 
 
-class AndersenEvChargeStatusSensor(AndersenEvDeviceInfoMixin, CoordinatorEntity, SensorEntity):
+class AndersenEvChargeStatusSensor(AndersenEvDeviceInfoMixin, CoordinatorEntity[AndersenEvCoordinator], SensorEntity):
     """Sensor for Andersen EV charge status values."""
 
     _attr_has_entity_name = True
@@ -581,7 +582,7 @@ class AndersenEvChargeStatusSensor(AndersenEvDeviceInfoMixin, CoordinatorEntity,
             _LOGGER.debug("Error updating charge status sensor: %s", err)
 
 
-class AndersenEvLiveSensor(AndersenEvDeviceInfoMixin, CoordinatorEntity, SensorEntity):
+class AndersenEvLiveSensor(AndersenEvDeviceInfoMixin, CoordinatorEntity[AndersenEvCoordinator], SensorEntity):
     """Sensor for Andersen EV live status values."""
 
     _attr_has_entity_name = True

@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from homeassistant.const import Platform
+from homeassistant.core import SupportsResponse
 from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
@@ -452,8 +453,8 @@ class TestAsyncSetupEntry:
         }
         for registered_call in hass.services.async_register.call_args_list:
             assert registered_call.args[0] == DOMAIN
-        assert registered[SERVICE_GET_DEVICE_INFO].kwargs["supports_response"] is True
-        assert registered[SERVICE_GET_DEVICE_STATUS].kwargs["supports_response"] is True
+        assert registered[SERVICE_GET_DEVICE_INFO].kwargs["supports_response"] is SupportsResponse.OPTIONAL
+        assert registered[SERVICE_GET_DEVICE_STATUS].kwargs["supports_response"] is SupportsResponse.OPTIONAL
 
     @pytest.mark.asyncio
     async def test_forwards_platform_setup(self):

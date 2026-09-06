@@ -8,14 +8,15 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-from gql import Client, gql
+from gql import Client, GraphQLRequest, gql
+from gql.client import AsyncClientSession
 from gql.dsl import DSLMutation, DSLSchema, dsl_gql
 from gql.transport.aiohttp import AIOHTTPTransport
 from gql.transport.exceptions import (
     TransportQueryError,
     TransportServerError,
 )
-from graphql import DocumentNode, build_schema
+from graphql import build_schema
 
 from . import const
 
@@ -76,7 +77,7 @@ class GraphQLClient:
         self.url = url
         self._token_refresh = token_refresh
         self._client: Client | None = None
-        self._session = None
+        self._session: AsyncClientSession | None = None
         self._refresh_handle: asyncio.TimerHandle | None = None
         self._initial_expiry_time = token_expiry_time
         self._refresh_task: asyncio.Task[None] | None = None
@@ -152,24 +153,24 @@ class GraphQLClient:
     # -- execution ---------------------------------------------------------
 
     @staticmethod
-    def _parse_document(query: str) -> DocumentNode:
-        """Parse a GraphQL query string into a DocumentNode."""
+    def _parse_document(query: str) -> GraphQLRequest:
+        """Parse a GraphQL query string into a GraphQLRequest."""
         return gql(query)
 
     async def execute_document(
         self,
-        document: DocumentNode,
+        document: GraphQLRequest,
         *,
         variable_values: dict[str, Any] | None = None,
         operation_name: str = "",
     ) -> dict[str, Any] | None:
-        """Execute a pre-built GraphQL DocumentNode.
+        """Execute a pre-built GraphQL request.
 
         This is the core execution method. It handles 401 auth failures by
         refreshing the token and retrying once.
 
         Args:
-            document: A parsed GraphQL DocumentNode (from gql() or dsl_gql()).
+            document: A parsed GraphQL request (from gql() or dsl_gql()).
             variable_values: Optional variable values for parameterised queries.
             operation_name: Name of the operation in the document.  Sent to
                 the server and used in log messages.  Leave empty for
@@ -180,14 +181,12 @@ class GraphQLClient:
         """
         label = operation_name or "GraphQL operation"
         wire_op_name = operation_name or None
+        request = GraphQLRequest(document, variable_values=variable_values, operation_name=wire_op_name)
 
         try:
             await self._ensure_connected()
-            return await self._session.execute(
-                document,
-                variable_values=variable_values,
-                operation_name=wire_op_name,
-            )
+            assert self._session is not None
+            return await self._session.execute(request)
         except TransportServerError as err:
             if err.code != 401:
                 _LOGGER.warning("Failed %s, HTTP status code: %s", label, err.code)
@@ -274,19 +273,17 @@ class GraphQLClient:
 
     async def _refresh_and_retry(
         self,
-        document: DocumentNode,
+        document: GraphQLRequest,
         variable_values: dict[str, Any] | None,
         wire_op_name: str | None,
         label: str,
     ) -> dict[str, Any] | None:
         """Refresh the token and retry the operation once."""
+        request = GraphQLRequest(document, variable_values=variable_values, operation_name=wire_op_name)
         try:
             await self._refresh_and_reconnect()
-            return await self._session.execute(
-                document,
-                variable_values=variable_values,
-                operation_name=wire_op_name,
-            )
+            assert self._session is not None
+            return await self._session.execute(request)
         except (TransportServerError, TransportQueryError, OSError) as retry_err:
             _LOGGER.error(
                 "Retry after token refresh failed for %s: %s",

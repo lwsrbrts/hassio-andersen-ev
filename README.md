@@ -81,6 +81,138 @@ data:
   device_id: "YOUR_DEVICE_ID"
 ```
 
+## Supported Devices
+
+This integration supports **Andersen A2** chargepoints connected to an Andersen Konnect+ account.
+Andersen currently makes one chargepoint product line, so there is nothing to select during setup:
+the integration reads the model name reported by the live API automatically (falling back to a
+generic "A2 (HW: ...)" hardware-revision label if the API doesn't report one), and shows it as the
+device model in **Settings > Devices & Services**.
+
+A single Andersen account can only be added once (the integration enforces one config entry per
+install), but if that account has more than one charger, every charger it returns is set up as its
+own device automatically - no per-charger configuration is needed.
+
+## Supported Functionality
+
+See [Features](#features) above for the full entity list and [Services](#services) for the
+service calls. In short:
+* A **lock** entity per charger to enable/disable charging (`userLock`/`userUnlock`).
+* A **switch** entity per charging schedule slot, so each schedule can be turned on or off
+  independently.
+* **Sensors** for energy, cost, live grid/solar/charge power, voltage, temperature, fault code and
+  connector state, sourced from the charger's historical and live status data.
+* **Services** to disable all schedules, reset an RCM fault, and pull a one-off detailed device
+  info/status snapshot into the UI.
+
+## How data is updated
+
+This is a cloud-only integration (`iot_class: cloud_polling`) - there is no local/LAN control of
+the chargepoint. All communication goes through Andersen's Konnect+ cloud (AWS Cognito
+authentication + a GraphQL API), so an internet connection and Andersen's cloud being up are both
+required for entities to update or for services/lock actions to work.
+
+A `DataUpdateCoordinator` polls the API every 60 seconds for all devices on the account. After a
+lock/unlock, schedule change, or RCM reset, the integration waits briefly before requesting a
+refresh, since the API needs a moment to apply the change before it's reflected in the polled
+status.
+
+If a poll fails, the integration keeps showing the last-known good data instead of immediately
+marking entities unavailable, so a brief cloud hiccup doesn't blank your dashboard. Entities are
+only marked unavailable once polling has failed for a device with no prior cached data.
+
+## Known limitations
+
+* **One Andersen account per Home Assistant instance.** The integration only allows a single
+  config entry, so multiple separate Andersen accounts (e.g. two households sharing one HA
+  instance) aren't supported side by side.
+* **Fully cloud-dependent.** There's no local fallback - if Andersen's API or cloud is down, data
+  stops updating and lock/schedule/service actions will fail until it recovers.
+* **Cost sensors assume GBP.** The cost sensors (`cost`, `grid_cost`, `solar_cost`,
+  `surplus_cost`) report in GBP; there's currently no way to change the currency unit if your
+  Andersen account uses a different one.
+* **Grid power sensors are a workaround, not a replacement for a smart meter integration.** They're
+  intended for those without a smart meter connected to Home Assistant already (see
+  [Features](#features)) - accuracy depends entirely on what the charger itself reports.
+* **Fault codes are raw values.** The fault code sensor exposes whatever numeric/string code the
+  charger reports, with no built-in lookup table translating codes to human-readable descriptions.
+
+## Use cases
+
+Beyond just seeing charger state in Home Assistant, the entities and services above are meant to
+be driven by automations:
+* **Tariff- or solar-aware scheduling** - toggle individual schedule switches on or off in
+  response to an off-peak tariff window starting/ending, or based on forecast/live solar
+  production, instead of managing schedules only from the Andersen app.
+* **Presence- or security-based charging control** - use the lock entity in automations so
+  charging only becomes available when, for example, someone is home or a specific door/gate is
+  unlocked.
+* **Solar-aware charging without a smart meter** - the live grid power sensors let you build
+  solar-surplus charging automations even if you don't otherwise have a smart meter integration
+  reporting home grid import/export.
+* **On-demand status for dashboards and scripts** - `get_device_status`/`get_device_info` return
+  data straight to the UI (or an automation/script), useful for a "check charger now" button or
+  script rather than waiting on the next 60-second poll.
+
+## Automation examples
+
+Turn off a specific charging schedule when a peak-tariff sensor becomes active:
+
+```yaml
+automation:
+  - alias: "Disable EV schedule during peak tariff"
+    trigger:
+      - platform: state
+        entity_id: sensor.electricity_tariff_rate
+        to: "peak"
+    action:
+      - service: switch.turn_off
+        target:
+          entity_id: switch.YOUR_SCHEDULE_1_SWITCH # e.g. switch.driveway_charger_schedule_1
+```
+
+Reset the RCM fault automatically when the fault code sensor reports a fault:
+
+```yaml
+automation:
+  - alias: "Reset Andersen RCM on fault"
+    trigger:
+      - platform: state
+        entity_id: sensor.YOUR_FAULT_CODE_SENSOR # e.g. sensor.driveway_charger_fault_code
+    condition:
+      - condition: template
+        value_template: "{{ trigger.to_state.state not in ['0', 'unknown', 'unavailable'] }}"
+    action:
+      - service: andersen_ev.reset_rcm
+        data:
+          device_id: "YOUR_DEVICE_ID"
+```
+
+Replace the placeholder entity IDs with your own - find them under **Settings > Devices &
+Services > Andersen EV > (your charger)**.
+
+## Troubleshooting
+
+* **Credentials stopped working** - if Andersen invalidates your stored password, the integration
+  raises a re-authentication request in **Settings > Devices & Services**; click it and re-enter
+  your password to resume. You don't need to remove and re-add the integration.
+* **Need to change just your password** - use **Reconfigure** on the integration entry (Settings
+  > Devices & Services > Andersen EV > Configure) to update the stored password without removing
+  and re-adding the integration.
+* **"Andersen API response format has changed" repair notification** - if Andersen's cloud starts
+  returning device data in a shape the integration doesn't recognise, a repair issue with this
+  title is raised (falling back to cached data in the meantime). This usually means Andersen
+  changed their API; check for an integration update, or open an issue if none is available.
+* **Entities showing as unavailable** - this normally means recent polls have failed with no
+  cached data to fall back on, most often because the Andersen cloud or your internet connection
+  is down. Check Andersen's status/app first, then check the Home Assistant logs (see below).
+* **Download diagnostics for a bug report** - from the integration entry's three-dot menu, choose
+  **Download diagnostics**. Credentials and auth tokens are automatically redacted; the file
+  includes the config entry, auth-state, and per-device status, which is far more useful in a bug
+  report than a description alone.
+* **Check the logs** - go to **Settings > System > Logs** and filter for `andersen_ev` to see
+  polling, authentication, and service-call errors and warnings.
+
 ## Removal
 
 1. In Home Assistant, go to **Settings > Devices & Services**.

@@ -38,7 +38,7 @@ rules:
   test-coverage: done
 
   # Gold
-  devices: todo
+  devices: done
   diagnostics: done
   discovery:
     status: exempt
